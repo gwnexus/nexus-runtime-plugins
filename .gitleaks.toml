@@ -1,0 +1,13 @@
+# Gitleaks configuration for nexus-oc-plugins
+# Scans commits for leaked secrets before they reach the repository.
+
+title = "nexus-oc-plugins gitleaks config"
+
+[allowlist]
+  description = "Global allowlist"
+  # Sentry DSNs are public identifiers, not secrets
+  regexTarget = "match"
+  regexes = [
+    '''NEXT_PUBLIC_SENTRY_DSN''',
+    '''SENTRY_DSN''',
+  ]

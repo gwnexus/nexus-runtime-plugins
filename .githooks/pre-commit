@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# .githooks/pre-commit — Gitleaks secret scan before commit
+#
+# Scans staged changes for leaked secrets using gitleaks.
+# Blocks the commit if secrets are detected.
+# Fails closed: scanner errors (or a missing gitleaks binary) also block
+# the commit rather than silently skipping the scan.
+#
+# Wired automatically on 'devbox shell' via scripts/devbox/dbx_init.sh
+# (git config core.hooksPath .githooks). Manual setup, if needed:
+#   git config core.hooksPath .githooks
+
+set -euo pipefail
+
+if ! command -v gitleaks &>/dev/null; then
+  echo "[pre-commit] ERROR: gitleaks not found. Install via: devbox shell (or brew install gitleaks)"
+  echo "             Commits are blocked until gitleaks is available."
+  echo "             To bypass (use with caution): git commit --no-verify"
+  exit 1
+fi
+
+echo "[pre-commit] Running gitleaks on staged changes..."
+
+GITLEAKS_EXIT=0
+gitleaks protect --staged --config=.gitleaks.toml --no-banner || GITLEAKS_EXIT=$?
+
+if [ "$GITLEAKS_EXIT" -eq 0 ]; then
+  echo "[pre-commit] No secrets detected."
+elif [ "$GITLEAKS_EXIT" -eq 1 ]; then
+  echo ""
+  echo "!! Gitleaks detected secrets in staged changes."
+  echo "   Review the findings above and remove any credentials."
+  echo "   To bypass (use with caution): git commit --no-verify"
+  exit 1
+else
+  echo ""
+  echo "!! Gitleaks exited with unexpected code $GITLEAKS_EXIT (scanner error)."
+  echo "   Fix the scanner issue or bypass with: git commit --no-verify"
+  exit 1
+fi
