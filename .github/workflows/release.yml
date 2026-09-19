@@ -48,7 +48,7 @@ jobs:
           done
 
           # Combined bundle with all plugins
-          zip -j dist/nexus-oc-plugins-all.zip \
+          zip -j dist/nexus-runtime-plugins-all.zip \
             100-compaction-plus/nexus-compaction-plus.ts \
             200-cost-control/nexus-cost-control.ts \
             300-headroom-intercept/nexus-headroom-intercept.ts \
@@ -58,7 +58,7 @@ jobs:
         if: github.ref == 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v4
         with:
-          name: nexus-oc-plugins-${{ steps.version.outputs.version }}
+          name: nexus-runtime-plugins-${{ steps.version.outputs.version }}
           path: dist/
           retention-days: 30
 
@@ -73,4 +73,4 @@ jobs:
             dist/200-cost-control.zip
             dist/300-headroom-intercept.zip
             dist/400-session-guard.zip
-            dist/nexus-oc-plugins-all.zip
+            dist/nexus-runtime-plugins-all.zip

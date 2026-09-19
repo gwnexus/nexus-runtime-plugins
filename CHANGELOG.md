@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Repository renamed `nexus-oc-plugins` -> `nexus-runtime-plugins`** (`package.json` name bumped to `1.9.0`). This repo is becoming the runtime-neutral home for Nexus plugin *core* logic plus per-runtime adapters (OpenCode today, Claude Code planned) rather than an OpenCode-only plugin set -- see ADR-C05 (Nexus Runtime Plugin Abstraction) in the Nexus Claude Runtime & Subscription workstream. This release only renames the repository, `package.json`, README/CI/CONTRIBUTING references, and the corresponding devbox workspace blueprint seed in NEXUS-APP (migration `0236`) -- no plugin behavior changed. The `core/adapters/` restructure (ADR-C05) is a separate, later change.
+
 ### Fixed
 - **`nexus-headroom-intercept` v0.5.14** — root-caused via NEXUS-APP Task `a3bf595b`: a stale/rotated token in the global `~/.config/nexus/credentials.toml` caused every project on the machine to silently run Headroom in `observe` mode (0 compressions) for weeks, even though `HEADROOM_MODE=transform` was correctly configured and `nexus run`'s pre-launch check kept reporting PASS (it only checks the env var, not live preflight reachability). Two fixes:
   - `getNexusConfig()` now also tries the project-local `opencode.json` `mcp.nexus.environment` block (the same credential the `nexus` MCP server itself uses successfully) as a fallback *before* the global `~/.config/nexus/` login files. Resolution order is now: explicit env vars → `opencode.json` (project-scoped) → global CLI login (last resort).

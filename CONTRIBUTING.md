@@ -1,11 +1,11 @@
-# Contributing to nexus-oc-plugins
+# Contributing to nexus-runtime-plugins
 
 Thank you for your interest in contributing to the Nexus OpenCode plugins.
 
 ## Getting Started
 
 1. Fork the repository
-2. Clone your fork: `git clone https://github.com/<your-username>/nexus-oc-plugins.git`
+2. Clone your fork: `git clone https://github.com/<your-username>/nexus-runtime-plugins.git`
 3. Create a branch: `git checkout -b feature/my-change`
 
 ## Requirements

@@ -1,6 +1,6 @@
-# nexus-oc-plugins
+# nexus-runtime-plugins
 
-[![CI](https://github.com/gwnexus/nexus-oc-plugins/actions/workflows/ci.yml/badge.svg)](https://github.com/gwnexus/nexus-oc-plugins/actions/workflows/ci.yml)
+[![CI](https://github.com/gwnexus/nexus-runtime-plugins/actions/workflows/ci.yml/badge.svg)](https://github.com/gwnexus/nexus-runtime-plugins/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Node.js 22+](https://img.shields.io/badge/node-22%2B-green.svg)](https://nodejs.org)
 [![OpenCode 1.14+](https://img.shields.io/badge/opencode-1.14%2B-black.svg)](https://opencode.ai)
@@ -207,7 +207,7 @@ automatically based on your project configuration.
 ## Project Structure
 
 ```
-nexus-oc-plugins/
+nexus-runtime-plugins/
   100-compaction-plus/
     nexus-compaction-plus.ts   -- plugin source
     README.md

@@ -1,7 +1,7 @@
 {
-  "name": "nexus-oc-plugins",
-  "version": "1.8.0",
-  "description": "OpenCode plugins for the Gatewarden Nexus platform",
+  "name": "nexus-runtime-plugins",
+  "version": "1.9.0",
+  "description": "Runtime-neutral Nexus plugins (OpenCode + Claude Code adapters) for the Gatewarden Nexus platform",
   "private": true,
   "type": "module",
   "engines": {
