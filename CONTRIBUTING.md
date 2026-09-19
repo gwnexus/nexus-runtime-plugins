@@ -2,6 +2,15 @@
 
 Thank you for your interest in contributing to the Nexus OpenCode plugins.
 
+> **Feature freeze in effect (2026-09-19).** This repo is in scope for the
+> Nexus Claude Runtime & Subscription workstream (ADR-C05: Nexus Runtime
+> Plugin Abstraction -- extracting `core/` + `adapters/opencode/` +
+> `adapters/claude-code/`). Until that restructure lands, please limit PRs
+> to **critical fixes only** (security, broken hooks, data loss). New
+> feature additions to the existing plugins should wait for the adapter
+> split to avoid being immediately re-homed/rewritten. Reach out before
+> starting non-critical work.
+
 ## Getting Started
 
 1. Fork the repository
