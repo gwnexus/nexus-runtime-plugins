@@ -17,6 +17,30 @@ import { createHash } from "node:crypto"
 /**
  * Plugin metadata — single source of truth for name/version.
  *
+ * Version: 0.5.14
+ * Changes from 0.5.13:
+ *   - Fix §13: credential source drift + silent transform->observe downgrade
+ *     invisibility (root-caused by Task a3bf595b in NEXUS-APP: a stale global
+ *     ~/.config/nexus/credentials.toml token caused every project on the
+ *     machine to silently run in observe mode for weeks while HEADROOM_MODE
+ *     env var and `nexus run`'s pre-launch check both still showed "transform"/
+ *     PASS). Two fixes:
+ *     (a) getNexusConfig() now also falls back to the project-local
+ *         opencode.json mcp.nexus.environment block (proven-fresh — it's the
+ *         same credential the nexus MCP server itself uses successfully)
+ *         BEFORE falling back to the global ~/.config/nexus/ login files.
+ *         Resolution order: env vars > opencode.json > global CLI login.
+ *     (b) Any silent transform->observe downgrade now also emits a loud
+ *         console.error() one-liner (not just a JSONL log line) naming the
+ *         exact reason and a suggested fix (e.g. "run 'nexus status'"), and
+ *         requestedMode + downgradeReason are now included on every
+ *         session_summary event so the gap between intent and effective mode
+ *         is visible without cross-referencing earlier log lines.
+ *
+ * Version: 0.5.13
+ * Changes from 0.5.12:
+ *   - (see CHANGELOG.md)
+ *
  * Version: 0.5.12
  * Changes from 0.5.10:
  *   - Fix §12: retrieval tool was never registered — used wrong SDK API.
@@ -67,7 +91,7 @@ import { createHash } from "node:crypto"
  */
 const PLUGIN_META = {
   name: "nexus-headroom-intercept",
-  version: "0.5.13",
+  version: "0.5.14",
   description:
     "Pre-injection context compression for Nexus MCP tool outputs. " +
     "Uses the tool.execute.after hook to apply policy-based deterministic " +
@@ -1144,31 +1168,76 @@ function compressFallback(raw: string, hash: string, tool: string): string {
 // Project context discovery
 // ---------------------------------------------------------------------------
 
-interface NexusConfig { apiUrl: string; token: string }
+interface NexusConfig { apiUrl: string; token: string; source?: string }
 interface ProjectContext { projectId: string; plugins: string[]; headroomEnabled: boolean }
 
+// Fix §13 (v0.5.14): credential source drift. This plugin previously resolved
+// credentials *only* from process.env or the global ~/.config/nexus/ files,
+// entirely independent of the project-local opencode.json MCP block that the
+// "nexus" MCP server itself uses. Because opencode.json is refreshed by
+// `nexus pull`/`nexus init` per project while ~/.config/nexus/credentials.toml
+// is a separate global login token, the two can drift out of sync — and when
+// the global one goes stale, this plugin silently fails preflight and
+// downgrades transform -> observe with no visible error (see Dispatch/Task
+// a3bf595b in NEXUS-APP). We now add the project-local opencode.json token as
+// an additional, higher-priority fallback: it is proven-fresh (the same
+// nexus_* MCP tool calls the agent is actively using succeed against it),
+// so preferring it here closes the gap without requiring a global re-login
+// just to unblock a single project. Resolution order:
+//   1. process.env.NEXUS_API_URL / NEXUS_PRIVATE_TOKEN (explicit override)
+//   2. <directory>/opencode.json mcp.nexus.environment (project-scoped, fresh)
+//   3. ~/.config/nexus/config.toml + credentials.toml (global CLI login)
+function readOpencodeJsonNexusCreds(directory: string): Partial<NexusConfig> {
+  try {
+    const ocPath = join(directory, "opencode.json")
+    if (!existsSync(ocPath)) return {}
+    const raw = readFileSync(ocPath, "utf-8")
+    const parsed = JSON.parse(raw) as {
+      mcp?: Record<string, { environment?: Record<string, string> }>
+    }
+    const env = parsed.mcp?.nexus?.environment ?? {}
+    const apiUrl = typeof env.NEXUS_API_URL === "string" ? env.NEXUS_API_URL : undefined
+    const token  = typeof env.NEXUS_PRIVATE_TOKEN === "string" ? env.NEXUS_PRIVATE_TOKEN : undefined
+    return { apiUrl, token }
+  } catch {
+    return {}
+  }
+}
+
 function getNexusConfig(directory: string): NexusConfig | null {
-  const apiUrl = process.env.NEXUS_API_URL
-  const token  = process.env.NEXUS_PRIVATE_TOKEN
-  if (apiUrl && token) return { apiUrl, token }
+  let resolvedUrl   = process.env.NEXUS_API_URL
+  let resolvedToken = process.env.NEXUS_PRIVATE_TOKEN
+  let source = "env"
+  if (resolvedUrl && resolvedToken) {
+    return { apiUrl: resolvedUrl, token: resolvedToken, source }
+  }
+
+  // Project-scoped opencode.json (fresher than global login in practice —
+  // written by `nexus pull`/`nexus init` for this specific workspace).
+  const ocCreds = readOpencodeJsonNexusCreds(directory)
+  if (!resolvedUrl && ocCreds.apiUrl) { resolvedUrl = ocCreds.apiUrl; source = "opencode.json" }
+  if (!resolvedToken && ocCreds.token) { resolvedToken = ocCreds.token; source = "opencode.json" }
+  if (resolvedUrl && resolvedToken) {
+    return { apiUrl: resolvedUrl, token: resolvedToken, source }
+  }
+
+  // Global CLI login (~/.config/nexus/) — last resort.
   try {
     const home = process.env.HOME ?? process.env.USERPROFILE ?? ""
     const configDir = join(home, ".config", "nexus")
-    let resolvedUrl   = apiUrl
-    let resolvedToken = token
     const configPath = join(configDir, "config.toml")
     const credsPath  = join(configDir, "credentials.toml")
     if (!resolvedUrl && existsSync(configPath)) {
       const raw = readFileSync(configPath, "utf-8")
       const m = raw.match(/api_url\s*=\s*"([^"]+)"/)
-      if (m) resolvedUrl = m[1]
+      if (m) { resolvedUrl = m[1]; source = "global-config" }
     }
     if (!resolvedToken && existsSync(credsPath)) {
       const raw = readFileSync(credsPath, "utf-8")
       const m = raw.match(/^\s*token\s*=\s*"([^"]+)"/m)
-      if (m) resolvedToken = m[1]
+      if (m) { resolvedToken = m[1]; source = "global-config" }
     }
-    if (resolvedUrl && resolvedToken) return { apiUrl: resolvedUrl, token: resolvedToken }
+    if (resolvedUrl && resolvedToken) return { apiUrl: resolvedUrl, token: resolvedToken, source } as NexusConfig
   } catch {}
   return null
 }
@@ -1289,6 +1358,26 @@ export const NexusHeadroomIntercept: Plugin = async (ctx) => {
 
   // Resolve mode: env override > default (observe)
   let mode: PluginMode = (process.env.HEADROOM_MODE as PluginMode) ?? DEFAULT_MODE
+  const requestedMode = mode
+  let downgradeReason: string | null = null
+
+  // Fix §13 (v0.5.14): silent-downgrade visibility. When the operator has
+  // explicitly configured HEADROOM_MODE=transform but the plugin has to fall
+  // back to observe mode, this is a meaningful runtime degradation that was
+  // previously only visible in the JSONL log file — invisible to `nexus run`'s
+  // pre-launch banner and easy to miss for weeks (see Task a3bf595b). Emit a
+  // loud, one-line stderr warning immediately so it surfaces in the terminal
+  // the agent/operator is looking at.
+  function warnLoudDowngrade(reason: string, detail: string): void {
+    downgradeReason = reason
+    if (requestedMode !== "transform") return
+    // eslint-disable-next-line no-console
+    console.error(
+      `[nexus-headroom-intercept] WARNING: HEADROOM_MODE=transform was requested but is ` +
+      `running in 'observe' mode (no compression applied). Reason: ${reason} — ${detail}. ` +
+      `See .nexus/headroom-intercept.jsonl for details, or re-run 'nexus preflight'.`
+    )
+  }
 
   // Fix 5: SDK version guard — downgrade to observe if incompatible
   if (mode === "transform") {
@@ -1296,6 +1385,7 @@ export const NexusHeadroomIntercept: Plugin = async (ctx) => {
     if (!sdkOk) {
       mode = "observe"
       logger.log("warn", "mode_downgraded", { reason: "sdk_version_incompatible_or_unknown", mode })
+      warnLoudDowngrade("sdk_version_incompatible_or_unknown", "installed @opencode-ai/plugin SDK version is below the required minimum")
     }
   }
 
@@ -1310,13 +1400,19 @@ export const NexusHeadroomIntercept: Plugin = async (ctx) => {
       if (projectContext && !projectContext.headroomEnabled) {
         mode = "observe"
         logger.log("warn", "project_gate_headroom_disabled", { projectId, mode })
+        warnLoudDowngrade("project_gate_headroom_disabled", "the 'headroom' plugin is not enabled for this project on the Nexus platform")
       } else if (projectContext) {
-        logger.log("info", "project_gate_ok", { projectId })
+        logger.log("info", "project_gate_ok", { projectId, credentialSource: nexusConfig.source })
       } else {
-        // Preflight unreachable
+        // Preflight unreachable — most common cause: stale/invalid token.
         if (REQUIRE_PREFLIGHT && mode === "transform") {
           mode = "observe"
-          logger.log("warn", "project_gate_preflight_unreachable_strict", { projectId, mode, require_preflight: true })
+          logger.log("warn", "project_gate_preflight_unreachable_strict", { projectId, mode, require_preflight: true, credentialSource: nexusConfig.source })
+          warnLoudDowngrade(
+            "project_gate_preflight_unreachable_strict",
+            `preflight call to the Nexus API failed (credential source: ${nexusConfig.source ?? "unknown"}) — ` +
+            `likely a stale/invalid token; run 'nexus status' / 'nexus login' to verify`
+          )
         } else {
           logger.log("warn", "project_gate_preflight_unreachable", { projectId, mode })
         }
@@ -1326,6 +1422,7 @@ export const NexusHeadroomIntercept: Plugin = async (ctx) => {
       if (REQUIRE_PREFLIGHT && mode === "transform") {
         mode = "observe"
         logger.log("warn", "project_gate_no_credentials_strict", { mode, require_preflight: true })
+        warnLoudDowngrade("project_gate_no_credentials_strict", "no Nexus API credentials found (env, opencode.json, or ~/.config/nexus/); run 'nexus login'")
       } else {
         logger.log("warn", "project_gate_no_credentials", { mode })
       }
@@ -1338,6 +1435,7 @@ export const NexusHeadroomIntercept: Plugin = async (ctx) => {
         mode,
         reason: "unknown namespace — transform requires explicit project identity",
       })
+      warnLoudDowngrade("project_gate_no_project_id_transform_downgrade", "no project_id found in .nexus/AGENTS.md — run 'nexus link' or 'nexus init'")
     } else {
       logger.log("warn", "project_gate_no_project_id", { mode })
     }
@@ -1346,6 +1444,7 @@ export const NexusHeadroomIntercept: Plugin = async (ctx) => {
   const store = new OriginalStore(directory, projectId)
 
   try { store.evictDisk() } catch {}
+
 
   const metrics: SessionMetrics = {
     totalCompressions: 0,
@@ -1678,6 +1777,11 @@ export const NexusHeadroomIntercept: Plugin = async (ctx) => {
        if (isIdle && hasActivity) {
         logger.log("info", "session_summary", {
           mode,
+          // Fix §13: surface requested vs. effective mode + downgrade reason
+          // directly on every summary line, so a silent transform->observe
+          // downgrade is visible without cross-referencing earlier log lines.
+          requestedMode,
+          downgradeReason,
           compressions: metrics.totalCompressions,
           locallyAppliedTransforms: metrics.locallyAppliedTransforms,
           observations: metrics.totalObservations,

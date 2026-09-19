@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **`nexus-headroom-intercept` v0.5.14** — root-caused via NEXUS-APP Task `a3bf595b`: a stale/rotated token in the global `~/.config/nexus/credentials.toml` caused every project on the machine to silently run Headroom in `observe` mode (0 compressions) for weeks, even though `HEADROOM_MODE=transform` was correctly configured and `nexus run`'s pre-launch check kept reporting PASS (it only checks the env var, not live preflight reachability). Two fixes:
+  - `getNexusConfig()` now also tries the project-local `opencode.json` `mcp.nexus.environment` block (the same credential the `nexus` MCP server itself uses successfully) as a fallback *before* the global `~/.config/nexus/` login files. Resolution order is now: explicit env vars → `opencode.json` (project-scoped) → global CLI login (last resort).
+  - Any silent `transform` → `observe` downgrade now emits a loud `console.error()` one-liner naming the exact reason and a suggested fix, in addition to the existing structured JSONL log line. `requestedMode` and `downgradeReason` are now included on every `session_summary` event.
+
 ## [1.8.0] - 2026-09-10
 
 ### Added

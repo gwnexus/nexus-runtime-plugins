@@ -22,7 +22,7 @@ plugin is independently installable via the OpenCode auto-discovery mechanism
 | --- | --- | --- |
 | [**Compaction Plus**](./100-compaction-plus/README.md) | `v1.8.1` | Preserves Nexus session context across OpenCode compaction events |
 | [**Cost Control**](./200-cost-control/README.md) | `v1.0.1` | Token usage and cost tracking via native message data |
-| [**Headroom Intercept**](./300-headroom-intercept/README.md) | `v0.5.13` | Pre-injection context compression for Nexus MCP tool outputs |
+| [**Headroom Intercept**](./300-headroom-intercept/README.md) | `v0.5.14` | Pre-injection context compression for Nexus MCP tool outputs |
 | [**Session Guard**](./400-session-guard/README.md) | `v1.1.2` | Enforces session append discipline after code-changing tool calls |
 | [**Routing Guard**](./500-routing-guard/README.md) | `v1.0.0` | Detects model routing divergence between Nexus config and the effective OpenCode provider catalog |
 | [**Attribution Headers**](./600-attribution-headers/README.md) | `v1.0.0` | Injects session/actor attribution headers on outgoing requests to the Nexus gateway provider |
@@ -76,7 +76,7 @@ removing the Helicone dependency.
 
 ## Headroom Intercept
 
-**`v0.5.13` · [`300-headroom-intercept`](./300-headroom-intercept)**
+**`v0.5.14` · [`300-headroom-intercept`](./300-headroom-intercept)**
 
 Nexus MCP tools can return large payloads -- `kb_memory` at `depth: deep`,
 `dispatch_inbox` with many entries, `kb_search` result sets -- that consume

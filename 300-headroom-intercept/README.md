@@ -5,7 +5,7 @@ Pre-injection context compression for Nexus MCP tool outputs.
 Uses the OpenCode `tool.execute.after` hook to apply policy-based deterministic
 compression before tool results enter the agent context window.
 
-**Current version:** `0.5.13`  
+**Current version:** `0.5.14`  
 **Default mode:** `observe` (safe — metrics only, no mutation)  
 **Transform mode:** experimental, requires explicit opt-in and provider-level verification
 
