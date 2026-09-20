@@ -180,10 +180,10 @@ before proceeding.
 > `capability-matrix.v1.json`: there is no continuous in-session validation
 > equivalent to OpenCode's `experimental.chat.system.transform`, so the
 > Claude Code adapter only validates once at `SessionStart` -- this gap is
-> disclosed rather than worked around. It also requires the provider
-> catalog and agent routing table as JSON files (no equivalent to
-> OpenCode's `client.config.providers()`/`client.app.agents()` SDK calls
-> exists in Claude Code); see the Claude Code adapter README.
+> disclosed rather than worked around. It reads its provider catalog and
+> agent routing table from `.nexus/generated/routing-catalog.json` /
+> `agent-routing.json`, confirmed live against `nexus-cli` v0.17.2 (2026-09-20);
+> see the Claude Code adapter README.
 
 Nexus writes agent-to-provider/model routing into a project's
 `opencode.json`, but that routing can silently diverge from what the running
@@ -288,6 +288,7 @@ nexus-runtime-plugins/
       types.ts
       detect.ts
       format.ts
+      nexus-cli-catalog.ts
     cost-control/
       types.ts
       config.ts

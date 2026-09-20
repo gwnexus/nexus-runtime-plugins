@@ -23,24 +23,44 @@ calls that return the live, merged provider/model catalog and agent routing
 table directly from the running instance. **Claude Code has no equivalent
 SDK surface for this plugin to query.**
 
-This adapter therefore expects the provider catalog and agent routing table
-to be supplied as JSON files via environment variables, mirroring the role
-`opencode.json` plays for the OpenCode adapter:
+**Confirmed live against nexus-cli v0.17.2 (2026-09-20, see Dispatch
+`dc5fdf9a` reply from nexus-app):** `nexus pull`/`nexus init` writes two
+files relative to the project's agentic root:
+
+```
+.nexus/generated/routing-catalog.json   -> { "model_routes": [{ route_alias, provider, model, lifecycle_status }, ...] }
+.nexus/generated/agent-routing.json     -> { "actors": [{ slug, title, model_profile_id, is_primary, priority, ... }, ...] }
+```
+
+These are read by default and converted into the plugin's internal
+`ProviderCatalog`/`AgentInfo[]` shape by
+[`core/routing-guard/nexus-cli-catalog.ts`](../../../core/routing-guard/nexus-cli-catalog.ts),
+which `detectRoutingWarnings()` then consumes unchanged. The env vars below
+are only needed to override the default file location (e.g. for manual
+testing with hand-written catalog/agent JSON in the plugin's own internal
+shape, which is also still accepted as a fallback).
+
+**Assumption not yet explicitly confirmed by nexus-app:** an actor's
+`model_profile_id` corresponds 1:1 to a model route's `route_alias`. If
+nexus-cli's actual linkage differs, `buildAgentInfoFromActors()` needs
+correction — flagged in that module's code comments.
+
+**Known caveat (confirmed by nexus-app, not a bug):** nexus-cli only injects
+env vars into `.claude/settings.json` on first-creation of that file.
+Projects with a pre-existing `.claude/settings.json` (e.g. from Track B1
+testing) won't have the env vars until the file is deleted and regenerated
+via `nexus pull --force`. This is now less of an issue since the adapter
+finds the two files itself at their default location without needing the
+env vars at all.
 
 ```bash
-export NEXUS_ROUTING_GUARD_CATALOG_PATH=/path/to/provider-catalog.json  # ProviderCatalog shape
-export NEXUS_ROUTING_GUARD_AGENTS_PATH=/path/to/agent-routing.json     # AgentInfo[] shape
+export NEXUS_ROUTING_GUARD_CATALOG_PATH=/path/to/provider-catalog.json  # optional override
+export NEXUS_ROUTING_GUARD_AGENTS_PATH=/path/to/agent-routing.json     # optional override
 ```
 
 If either file is missing, the check is skipped silently (fail-open,
 matching the OpenCode adapter's never-block behavior) and logged as a
 warning.
-
-**VERIFY BEFORE PRODUCTION USE:** whether `nexus pull`/`nexus init` actually
-generates these two files for Claude Code projects. If not, this adapter has
-no data source and the check is a no-op until that Nexus CLI-side work
-lands. This is flagged explicitly because it is outside this repo's scope
-to fix -- see the reply on Dispatch `dc5fdf9a`.
 
 ## Hard constraints (same as OpenCode adapter)
 
@@ -77,8 +97,8 @@ Add to `.claude/settings.json`:
 | Env var | Default | Effect |
 |---|---|---|
 | `NEXUS_ROUTING_GUARD_ENABLED` | `true` | Set to `"false"` to disable the check entirely. |
-| `NEXUS_ROUTING_GUARD_CATALOG_PATH` | none | Path to a JSON file matching the `ProviderCatalog` shape. |
-| `NEXUS_ROUTING_GUARD_AGENTS_PATH` | none | Path to a JSON file matching the `AgentInfo[]` shape. |
+| `NEXUS_ROUTING_GUARD_CATALOG_PATH` | `.nexus/generated/routing-catalog.json` | Override the catalog file path. |
+| `NEXUS_ROUTING_GUARD_AGENTS_PATH` | `.nexus/generated/agent-routing.json` | Override the agent-routing file path. |
 
 ## Logs
 
@@ -88,12 +108,16 @@ the OpenCode adapter).
 ## Testing
 
 ```bash
-npm test -- adapters/claude-code/routing-guard
+npm test -- adapters/claude-code/routing-guard core/routing-guard
 ```
 
-5 unit tests covering the env-var opt-out, missing-file fail-open behavior,
-clean-config no-op, divergence banner generation, and malformed-JSON
-fail-open behavior.
+7 unit tests for this adapter (env-var opt-out, missing-file fail-open
+behavior, clean-config no-op, divergence banner generation, malformed-JSON
+fail-open behavior, nexus-cli shape auto-detection with default paths, and
+no-matching-route handling), plus 4 unit tests for the
+`nexus-cli-catalog.ts` transform (provider grouping, `model_profile_id` ->
+`route_alias` resolution, end-to-end divergence detection through the
+transform).
 
 ## License
 

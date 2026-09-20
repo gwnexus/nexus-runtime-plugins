@@ -89,4 +89,41 @@ describe("routing-guard Claude Code adapter", () => {
     expect(() => handleSessionStart({}, logger)).not.toThrow()
     expect(handleSessionStart({}, logger)).toBeNull()
   })
+
+  describe("nexus-cli generated file shape (routing-catalog.json / agent-routing.json)", () => {
+    it("auto-detects and transforms the real nexus-cli shape, using default paths under .nexus/generated/ when no env vars are set", () => {
+      vi.mocked(existsSync).mockReturnValue(true)
+      vi.mocked(readFileSync).mockImplementation((path: any) => {
+        expect(String(path)).toContain(".nexus/generated/")
+        if (String(path).includes("routing-catalog")) {
+          return JSON.stringify({
+            model_routes: [{ route_alias: "nexus-plan", provider: "github-copilot", model: "claude-sonnet-5" }],
+          })
+        }
+        return JSON.stringify({ actors: [{ slug: "nexus-plan", model_profile_id: "nexus-plan" }] })
+      })
+
+      const result = handleSessionStart({ cwd: "/tmp/proj" }, logger)
+      expect(result).toBeNull() // clean — no divergence
+    })
+
+    it("skips agents whose model_profile_id has no matching route (no divergence possible)", () => {
+      vi.mocked(existsSync).mockReturnValue(true)
+      vi.mocked(readFileSync).mockImplementation((path: any) => {
+        if (String(path).includes("routing-catalog")) {
+          return JSON.stringify({
+            model_routes: [{ route_alias: "nexus-plan", provider: "github-copilot", model: "claude-sonnet-5" }],
+          })
+        }
+        // model_profile_id points to a route_alias that isn't in the catalog above
+        return JSON.stringify({ actors: [{ slug: "nexus-orphan", model_profile_id: "nonexistent-alias" }] })
+      })
+
+      // No matching route -> agent has no explicit model -> never checked -> clean.
+      // Real divergence detection through this transform is covered end-to-end
+      // in core/routing-guard/nexus-cli-catalog.test.ts.
+      const result = handleSessionStart({ cwd: "/tmp/proj" }, logger)
+      expect(result).toBeNull()
+    })
+  })
 })
