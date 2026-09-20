@@ -5,16 +5,22 @@
 [![Node.js 22+](https://img.shields.io/badge/node-22%2B-green.svg)](https://nodejs.org)
 [![OpenCode 1.14+](https://img.shields.io/badge/opencode-1.14%2B-black.svg)](https://opencode.ai)
 
-OpenCode plugins for the [Nexus](https://nexus.gatewarden.eu) platform.
+OpenCode plugins for the [Nexus](https://nexus.gatewarden.eu) platform. Under
+ADR-C05, this repo is migrating to a runtime-neutral `core/` + `adapters/`
+structure so plugins can also run under Claude Code; `nexus-session-guard` is
+the first plugin migrated (OpenCode + Claude Code adapters both available).
+The remaining plugins below are still OpenCode-only until their own
+migration lands.
 
-These plugins extend OpenCode with deep Nexus integration. Each plugin targets a
-specific problem in the agent lifecycle: session continuity across compaction
-events, cost visibility via session timeline recording, and context budget
-management through pre-injection compression of Nexus MCP outputs.
+These plugins extend the coding agent with deep Nexus integration. Each plugin
+targets a specific problem in the agent lifecycle: session continuity across
+compaction events, cost visibility via session timeline recording, and context
+budget management through pre-injection compression of Nexus MCP outputs.
 
-Plugins are standalone `.ts` files — no build step, no monorepo toolchain. Each
-plugin is independently installable via the OpenCode auto-discovery mechanism
-(`.opencode/plugins/`).
+Plugins not yet migrated are standalone `.ts` files — no build step, no
+monorepo toolchain — and are independently installable via the OpenCode
+auto-discovery mechanism (`.opencode/plugins/`). Migrated plugins (see
+`core/` + `adapters/`) share core logic across runtime-specific adapters.
 
 ## Plugins
 
