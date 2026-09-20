@@ -42,7 +42,7 @@ jobs:
           mkdir -p dist
 
           # Individual plugin zips (plugin source + README)
-          for dir in 100-compaction-plus 200-cost-control; do
+          for dir in 200-cost-control; do
             plugin_name=$(basename "$dir")
             zip -j "dist/${plugin_name}.zip" "${dir}"/*.ts "${dir}"/README.md
           done
@@ -60,19 +60,28 @@ jobs:
             adapters/claude-code/headroom-intercept/nexus-headroom-intercept.ts \
             adapters/claude-code/headroom-intercept/README.md \
             core/headroom-intercept/*.ts
+          zip -j dist/compaction-plus.zip \
+            adapters/opencode/compaction-plus/nexus-compaction-plus.ts \
+            adapters/opencode/compaction-plus/README.md \
+            adapters/claude-code/compaction-plus/nexus-compaction-plus.ts \
+            adapters/claude-code/compaction-plus/README.md \
+            core/compaction-plus/*.ts \
+            core/logger.ts
 
           # Combined bundle with all plugins
           zip -j dist/nexus-runtime-plugins-all.zip \
-            100-compaction-plus/nexus-compaction-plus.ts \
             200-cost-control/nexus-cost-control.ts \
             adapters/opencode/session-guard/nexus-session-guard.ts \
             adapters/claude-code/session-guard/nexus-session-guard.ts \
             adapters/opencode/headroom-intercept/nexus-headroom-intercept.ts \
             adapters/claude-code/headroom-intercept/nexus-headroom-intercept.ts \
+            adapters/opencode/compaction-plus/nexus-compaction-plus.ts \
+            adapters/claude-code/compaction-plus/nexus-compaction-plus.ts \
             core/logger.ts \
             core/state-store.ts \
             core/session-guard/logic.ts \
-            core/headroom-intercept/*.ts
+            core/headroom-intercept/*.ts \
+            core/compaction-plus/*.ts
 
       - name: Upload artifacts (branch push)
         if: github.ref == 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')
@@ -89,8 +98,8 @@ jobs:
           name: v${{ steps.version.outputs.version }}
           generate_release_notes: true
           files: |
-            dist/100-compaction-plus.zip
             dist/200-cost-control.zip
             dist/session-guard.zip
             dist/headroom-intercept.zip
+            dist/compaction-plus.zip
             dist/nexus-runtime-plugins-all.zip

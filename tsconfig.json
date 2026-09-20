@@ -16,7 +16,6 @@
     "noUnusedParameters": false
   },
   "include": [
-    "100-compaction-plus/**/*.ts",
     "200-cost-control/**/*.ts",
     "core/**/*.ts",
     "adapters/**/*.ts"

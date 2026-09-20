@@ -7,10 +7,10 @@
 
 OpenCode plugins for the [Nexus](https://nexus.gatewarden.eu) platform. Under
 ADR-C05, this repo is migrating to a runtime-neutral `core/` + `adapters/`
-structure so plugins can also run under Claude Code; `nexus-session-guard`
-and `nexus-headroom-intercept` are migrated so far (OpenCode + Claude Code
-adapters both available). The remaining plugins below are still OpenCode-only
-until their own migration lands.
+structure so plugins can also run under Claude Code; `nexus-session-guard`,
+`nexus-headroom-intercept`, and `nexus-compaction-plus` are migrated so far
+(OpenCode + Claude Code adapters both available). The remaining plugins below
+are still OpenCode-only until their own migration lands.
 
 These plugins extend the coding agent with deep Nexus integration. Each plugin
 targets a specific problem in the agent lifecycle: session continuity across
@@ -26,7 +26,7 @@ auto-discovery mechanism (`.opencode/plugins/`). Migrated plugins (see
 
 | Plugin | Version | Description |
 | --- | --- | --- |
-| [**Compaction Plus**](./100-compaction-plus/README.md) | `v1.8.1` | Preserves Nexus session context across OpenCode compaction events |
+| [**Compaction Plus**](./adapters/opencode/compaction-plus/README.md) | `v1.8.1` | Preserves Nexus session context across compaction events (OpenCode + Claude Code adapters) |
 | [**Cost Control**](./200-cost-control/README.md) | `v1.0.1` | Token usage and cost tracking via native message data |
 | [**Headroom Intercept**](./adapters/opencode/headroom-intercept/README.md) | `v0.5.14` | Pre-injection context compression for Nexus MCP tool outputs (OpenCode + Claude Code adapters) |
 | [**Session Guard**](./adapters/opencode/session-guard/README.md) | `v1.1.2` | Enforces session append discipline after code-changing tool calls (OpenCode + Claude Code adapters) |
@@ -35,7 +35,15 @@ auto-discovery mechanism (`.opencode/plugins/`). Migrated plugins (see
 
 ## Compaction Plus
 
-**`v1.8.1` · [`100-compaction-plus`](./100-compaction-plus)**
+**`v1.8.1` · [`adapters/opencode/compaction-plus`](./adapters/opencode/compaction-plus) (OpenCode) · [`adapters/claude-code/compaction-plus`](./adapters/claude-code/compaction-plus) (Claude Code)**
+
+> Migrated to the ADR-C05 `core/` + `adapters/` structure. State extraction,
+> context building, and the Nexus API call live in
+> [`core/compaction-plus/`](./core/compaction-plus), shared between both
+> adapters. The Claude Code adapter is a `partial`-parity plugin per
+> `capability-matrix.v1.json` -- `PreCompact`/`PostCompact` hook behavior
+> across interactive vs. headless (`claude -p`) sessions has not yet been
+> verified identical; see the Claude Code adapter README for details.
 
 OpenCode compacts long conversations to manage context budget. During
 compaction, the LLM generates a continuation summary from the conversation
@@ -200,8 +208,8 @@ Each plugin is a single `.ts` file. Drop it into `.opencode/plugins/` and
 OpenCode auto-discovers it on the next start.
 
 ```bash
-# Example: install Compaction Plus
-cp 100-compaction-plus/nexus-compaction-plus.ts /path/to/project/.opencode/plugins/
+# Example: install Compaction Plus (OpenCode adapter)
+cp adapters/opencode/compaction-plus/nexus-compaction-plus.ts /path/to/project/.opencode/plugins/
 ```
 
 Declare the SDK dependency in `.opencode/package.json`:
@@ -230,9 +238,6 @@ automatically based on your project configuration.
 
 ```
 nexus-runtime-plugins/
-  100-compaction-plus/
-    nexus-compaction-plus.ts   -- plugin source
-    README.md
   200-cost-control/
     nexus-cost-control.ts      -- plugin source
     README.md
@@ -255,6 +260,11 @@ nexus-runtime-plugins/
       structured-logger.ts
       config.ts
       engine.ts
+    compaction-plus/
+      types.ts
+      config.ts
+      state.ts
+      api.ts
   adapters/                        -- ADR-C05: per-runtime hook wiring
     opencode/
       session-guard/
@@ -263,6 +273,9 @@ nexus-runtime-plugins/
       headroom-intercept/
         nexus-headroom-intercept.ts
         README.md
+      compaction-plus/
+        nexus-compaction-plus.ts
+        README.md
     claude-code/
       session-guard/
         nexus-session-guard.ts
@@ -270,13 +283,16 @@ nexus-runtime-plugins/
       headroom-intercept/
         nexus-headroom-intercept.ts
         README.md
+      compaction-plus/
+        nexus-compaction-plus.ts
+        README.md
 ```
 
-Session Guard and Headroom Intercept are the ADR-C05 Track B2 plugins
-migrated so far: out of their flat `400-session-guard/` /
-`300-headroom-intercept/` directories into `core/` + `adapters/opencode/` +
-`adapters/claude-code/`. The remaining plugins will follow the same pattern
-as Track B2 proceeds (`100-compaction-plus` next, then `500-routing-guard`,
+Session Guard, Headroom Intercept, and Compaction Plus are the ADR-C05 Track
+B2 plugins migrated so far: out of their flat `400-session-guard/` /
+`300-headroom-intercept/` / `100-compaction-plus/` directories into `core/` +
+`adapters/opencode/` + `adapters/claude-code/`. The remaining plugins will
+follow the same pattern as Track B2 proceeds (`500-routing-guard` next, then
 `200-cost-control`; `600-attribution-headers` is explicitly not ported to
 Claude Code per ADR-C08).
 

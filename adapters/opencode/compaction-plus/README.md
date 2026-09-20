@@ -1,9 +1,16 @@
-# nexus-compaction-plus
+# nexus-compaction-plus (OpenCode adapter)
 
 An [OpenCode](https://opencode.ai) plugin that preserves [Nexus](https://nexus.gatewarden.eu) session context across compaction events.
 
 **Current version:** `v1.8.1`  
 **Requires:** Nexus MCP server (`NEXUS_API_URL`, `NEXUS_PRIVATE_TOKEN`)
+
+> Migrated to the ADR-C05 `core/` + `adapters/` structure (Track B2). State
+> extraction, context building, and the Nexus API call now live in
+> [`core/compaction-plus/`](../../../core/compaction-plus), shared with the
+> [Claude Code adapter](../../claude-code/compaction-plus). This file
+> documents the OpenCode-specific wiring (message/part parsing, hook
+> registration).
 
 When OpenCode compacts a long conversation, important session metadata — active tasks, recent decisions, project directives — can be lost. This plugin hooks into compaction to:
 
@@ -85,12 +92,14 @@ The plugin auto-discovers the active Nexus session and project from MCP tool cal
 ## Testing
 
 ```bash
-npm test -- 100-compaction-plus
+npm test -- adapters/opencode/compaction-plus core/compaction-plus
 ```
 
-11 unit tests covering hook registration, context injection, state extraction,
-compaction lifecycle, and legacy tool-invocation shape support.
+11 unit tests for this adapter (hook registration, context injection, state
+extraction, compaction lifecycle, legacy tool-invocation shape support), plus
+14 unit tests for the shared core modules (state extraction, config
+resolution, API call).
 
 ## License
 
-Apache-2.0 — Copyright 2025-2026 RELICFROG Holding UG, contributed by Patrick Paechatz. See [LICENSE](../LICENSE).
+Apache-2.0 — Copyright 2025-2026 RELICFROG Holding UG, contributed by Patrick Paechatz. See [LICENSE](../../../LICENSE).
