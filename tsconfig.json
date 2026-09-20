@@ -16,7 +16,6 @@
     "noUnusedParameters": false
   },
   "include": [
-    "200-cost-control/**/*.ts",
     "core/**/*.ts",
     "adapters/**/*.ts"
   ],

@@ -1,0 +1,236 @@
+import { type Plugin, tool } from "@opencode-ai/plugin"
+import { createFileLogger } from "../../../core/logger.ts"
+import { getNexusConfig, getHeliconeConfig } from "../../../core/cost-control/config.ts"
+import { tryParseJson, extractNexusState } from "../../../core/cost-control/state.ts"
+import { queryHeliconeSession } from "../../../core/cost-control/helicone.ts"
+import { formatCostSummary } from "../../../core/cost-control/format.ts"
+import { appendCostEntry } from "../../../core/cost-control/api.ts"
+import type { NormalizedToolCall } from "../../../core/cost-control/types.ts"
+
+/**
+ * Nexus Cost Control — OpenCode adapter (ADR-C05, Track B2).
+ *
+ * Wires the runtime-agnostic core/cost-control logic (credential resolution,
+ * state extraction, Helicone query, formatting, Nexus API call) to
+ * OpenCode's `event` (`session.idle`, debounced cost-snapshot recording)
+ * hook and the `nexus_cost_summary` / `nexus_show_plugins` tools. Parsing
+ * OpenCode's message/part shape into the shared `NormalizedToolCall[]`
+ * format is the only OpenCode-specific concern left in this file.
+ */
+const PLUGIN_META = {
+  name: "nexus-cost-control",
+  version: "1.0.1",
+  description:
+    "Token usage and cost tracking for Nexus sessions via Helicone. " +
+    "Wraps Helicone's LLM observability API to surface per-session token " +
+    "counts and estimated cost directly in the Nexus session timeline.",
+} as const
+
+interface ToolPartShape {
+  type: string
+  tool?: string
+  state?: { status?: string; input?: Record<string, unknown>; output?: string }
+  toolName?: string
+  args?: Record<string, unknown>
+  result?: unknown
+}
+
+/** Convert OpenCode session messages into the shared NormalizedToolCall[] shape. */
+function normalizeOpenCodeMessages(
+  messages: Array<{ info: { role: string }; parts: Array<Record<string, unknown>> }>,
+): NormalizedToolCall[] {
+  const calls: NormalizedToolCall[] = []
+
+  for (const msg of messages) {
+    for (const rawPart of msg.parts ?? []) {
+      const part = rawPart as unknown as ToolPartShape
+      if (part.type !== "tool" && part.type !== "tool-invocation") continue
+
+      const toolName = (part.tool ?? part.toolName ?? "") as string
+      if (!toolName) continue
+
+      const args = (part.state?.input ?? part.args ?? {}) as Record<string, unknown>
+
+      let result: Record<string, unknown> | null = null
+      if (part.state?.output) {
+        result = tryParseJson(part.state.output)
+      } else if (part.result && typeof part.result === "object") {
+        result = part.result as Record<string, unknown>
+      }
+
+      calls.push({ tool: toolName, args, result })
+    }
+  }
+
+  return calls
+}
+
+export const NexusCostControl: Plugin = async (ctx) => {
+  const { client, directory } = ctx
+  const fileLog = createFileLogger(directory, "cost-control.log")
+  const nexusConfig = getNexusConfig(directory)
+  const heliconeConfig = getHeliconeConfig(directory)
+  const loadedAt = new Date().toISOString()
+
+  fileLog("info", "=== nexus-cost-control initializing ===")
+  fileLog("info", `Directory: ${directory}`)
+  fileLog("info", nexusConfig ? `Nexus API: ${nexusConfig.apiUrl}` : "WARNING: Nexus credentials not found")
+  fileLog(
+    "info",
+    heliconeConfig ? "Helicone: API key configured" : "WARNING: HELICONE_API_KEY not set — cost tracking disabled",
+  )
+
+  await client.app.log({
+    body: {
+      service: PLUGIN_META.name,
+      level: "info",
+      message: `Plugin loaded — Nexus: ${nexusConfig ? nexusConfig.apiUrl : "NOT CONFIGURED"} | Helicone: ${heliconeConfig ? "configured" : "NOT CONFIGURED"}`,
+    },
+  })
+
+  /**
+   * Idle debounce: we only want to record a cost entry once per "work burst",
+   * not on every idle event. We track the last append time and only write to
+   * Nexus if at least IDLE_DEBOUNCE_MS have passed since the last one.
+   */
+  const IDLE_DEBOUNCE_MS = 5 * 60 * 1000 // 5 minutes
+  let lastAppendAt: number | null = null
+  let lastAppendedTokens: number | null = null
+
+  return {
+    tool: {
+      nexus_cost_summary: tool({
+        description:
+          "Show token usage and estimated cost for the current Nexus session, " +
+          "queried live from Helicone. Returns input/output/cache token counts " +
+          "and estimated cost in USD. Use this to give the user a cost overview " +
+          "or before closing a session.",
+        args: {},
+        async execute() {
+          if (!heliconeConfig) {
+            return "Cost tracking is not configured. Set HELICONE_API_KEY to enable Helicone integration."
+          }
+
+          let nexusSessionId: string | undefined
+          try {
+            const sessions = await client.session.list({})
+            const activeSessions = sessions.data ?? []
+            if (activeSessions.length > 0) {
+              const latestSession = activeSessions[0]
+              const msgs = await client.session.messages({ path: { id: (latestSession as { id: string }).id } })
+              const calls = normalizeOpenCodeMessages(
+                (msgs.data ?? []) as Array<{ info: { role: string }; parts: Array<Record<string, unknown>> }>,
+              )
+              const state = extractNexusState(calls, (m) => fileLog("debug", m))
+              nexusSessionId = state.sessionId
+            }
+          } catch (err) {
+            fileLog("error", `Failed to fetch session for tool: ${err}`)
+          }
+
+          if (!nexusSessionId) {
+            return "No active Nexus session found. Start a session with nexus_session_create first."
+          }
+
+          const cost = await queryHeliconeSession(heliconeConfig, nexusSessionId, (level, msg) => fileLog(level, msg))
+          if (!cost) {
+            return `No Helicone data found for session \`${nexusSessionId}\`. Make sure requests are routed through the Helicone proxy and that the Helicone-Session-Id header is set to the Nexus session ID.`
+          }
+
+          return formatCostSummary(cost, PLUGIN_META.version)
+        },
+      }),
+
+      nexus_show_plugins: tool({
+        description: "Show all loaded Nexus plugins, their versions, and connection status",
+        args: {},
+        async execute() {
+          const nexusStatus = nexusConfig ? `connected (${nexusConfig.apiUrl})` : "disconnected — credentials missing"
+          const heliconeStatus = heliconeConfig ? "connected — API key set" : "disconnected — HELICONE_API_KEY not set"
+
+          return [
+            `## Nexus Plugins`,
+            ``,
+            `| Plugin | Version | Status | Loaded |`,
+            `|--------|---------|--------|--------|`,
+            `| ${PLUGIN_META.name} | ${PLUGIN_META.version} | Nexus: ${nexusStatus} · Helicone: ${heliconeStatus} | ${loadedAt} |`,
+            ``,
+            `**Description:** ${PLUGIN_META.description}`,
+            ``,
+            `### Hooks registered`,
+            `- \`event (session.idle)\` — queries Helicone and records cost entry in active Nexus session (debounced: 5 min)`,
+            ``,
+            `### Tools registered`,
+            `- \`nexus_cost_summary\` — on-demand live cost snapshot from Helicone`,
+            `- \`nexus_show_plugins\` — this overview`,
+          ].join("\n")
+        },
+      }),
+    },
+
+    event: async ({ event }) => {
+      const eventType = event.type as string
+
+      if (eventType !== "session.idle") return
+      if (!heliconeConfig || !nexusConfig) return
+
+      if (lastAppendAt && Date.now() - lastAppendAt < IDLE_DEBOUNCE_MS) {
+        fileLog("debug", `session.idle — skipping (last append ${Date.now() - lastAppendAt}ms ago)`)
+        return
+      }
+
+      const sessionID = (event as unknown as { properties: { sessionID: string } }).properties?.sessionID
+
+      if (!sessionID) {
+        fileLog("warn", "session.idle — no sessionID in event")
+        return
+      }
+
+      fileLog("info", `session.idle fired — sessionID=${sessionID}`)
+
+      try {
+        const { data } = await client.session.messages({ path: { id: sessionID } })
+        if (!data) return
+
+        const messages = data as Array<{ info: { role: string }; parts: Array<Record<string, unknown>> }>
+        const calls = normalizeOpenCodeMessages(messages)
+        const state = extractNexusState(calls, (m) => fileLog("debug", m))
+
+        if (!state.sessionId) {
+          fileLog("info", "No Nexus session ID found — skipping cost recording")
+          return
+        }
+
+        const cost = await queryHeliconeSession(heliconeConfig, state.sessionId, (level, msg) => fileLog(level, msg))
+        if (!cost) {
+          fileLog("info", `No Helicone data for session ${state.sessionId} — skipping`)
+          return
+        }
+
+        if (lastAppendedTokens !== null && cost.totalTokens === lastAppendedTokens) {
+          fileLog("debug", `session.idle — skipping (no token delta, still ${cost.totalTokens})`)
+          return
+        }
+
+        await appendCostEntry(nexusConfig, state.sessionId, cost, PLUGIN_META, (level, msg) => fileLog(level, msg))
+
+        lastAppendAt = Date.now()
+        lastAppendedTokens = cost.totalTokens
+
+        fileLog("info", `Cost entry recorded — $${cost.costUsd.toFixed(6)} / ${cost.totalTokens} tokens`)
+        await client.app.log({
+          body: {
+            service: PLUGIN_META.name,
+            level: "info",
+            message: `Cost snapshot recorded in Nexus session ${state.sessionId}: $${cost.costUsd.toFixed(6)} / ${cost.totalTokens} tokens`,
+          },
+        })
+      } catch (err) {
+        fileLog("error", `session.idle handler failed: ${err}`)
+        await client.app.log({
+          body: { service: PLUGIN_META.name, level: "error", message: `Failed to record cost entry: ${err}` },
+        })
+      }
+    },
+  }
+}

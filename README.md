@@ -6,12 +6,12 @@
 [![OpenCode 1.14+](https://img.shields.io/badge/opencode-1.14%2B-black.svg)](https://opencode.ai)
 
 OpenCode plugins for the [Nexus](https://nexus.gatewarden.eu) platform. Under
-ADR-C05, this repo is migrating to a runtime-neutral `core/` + `adapters/`
+ADR-C05, this repo has migrated to a runtime-neutral `core/` + `adapters/`
 structure so plugins can also run under Claude Code; `nexus-session-guard`,
-`nexus-headroom-intercept`, `nexus-compaction-plus`, and
-`nexus-routing-guard` are migrated so far (OpenCode + Claude Code adapters
-both available). The remaining plugin below is still OpenCode-only until its
-own migration lands.
+`nexus-headroom-intercept`, `nexus-compaction-plus`, `nexus-routing-guard`,
+and `nexus-cost-control` are migrated (OpenCode + Claude Code adapters both
+available for each). `nexus-attribution-headers` remains OpenCode-only by
+design (ADR-C08).
 
 These plugins extend the coding agent with deep Nexus integration. Each plugin
 targets a specific problem in the agent lifecycle: session continuity across
@@ -28,7 +28,7 @@ auto-discovery mechanism (`.opencode/plugins/`). Migrated plugins (see
 | Plugin | Version | Description |
 | --- | --- | --- |
 | [**Compaction Plus**](./adapters/opencode/compaction-plus/README.md) | `v1.8.1` | Preserves Nexus session context across compaction events (OpenCode + Claude Code adapters) |
-| [**Cost Control**](./200-cost-control/README.md) | `v1.0.1` | Token usage and cost tracking via native message data |
+| [**Cost Control**](./adapters/opencode/cost-control/README.md) | `v1.0.1` | Token usage and cost tracking via Helicone (OpenCode + Claude Code adapters) |
 | [**Headroom Intercept**](./adapters/opencode/headroom-intercept/README.md) | `v0.5.14` | Pre-injection context compression for Nexus MCP tool outputs (OpenCode + Claude Code adapters) |
 | [**Session Guard**](./adapters/opencode/session-guard/README.md) | `v1.1.2` | Enforces session append discipline after code-changing tool calls (OpenCode + Claude Code adapters) |
 | [**Routing Guard**](./adapters/opencode/routing-guard/README.md) | `v1.0.0` | Detects model routing divergence between Nexus config and the effective provider catalog (OpenCode + Claude Code adapters) |
@@ -67,7 +67,19 @@ This plugin solves that by hooking directly into the compaction lifecycle:
 
 ## Cost Control
 
-**`v1.0.1` · [`200-cost-control`](./200-cost-control)**
+**`v1.0.1` · [`adapters/opencode/cost-control`](./adapters/opencode/cost-control) (OpenCode) · [`adapters/claude-code/cost-control`](./adapters/claude-code/cost-control) (Claude Code)**
+
+> Migrated to the ADR-C05 `core/` + `adapters/` structure (Track B2, the
+> last plugin in this restructure pass). Credential resolution, state
+> extraction, the Helicone client, formatting, and the Nexus API call live
+> in [`core/cost-control/`](./core/cost-control), shared between both
+> adapters. The Claude Code adapter is `partial` parity per
+> `capability-matrix.v1.json` -- no idle-detection event exists in Claude
+> Code, so cost recording happens around the `Stop` hook instead of
+> `session.idle`, on a different cadence; the on-demand
+> `nexus_cost_summary` tool is not implemented as a Claude Code hook (no
+> custom-tool-registration mechanism there) and needs a Nexus-MCP-server-side
+> follow-up, same as the headroom-intercept retrieval tool gap.
 
 Makes token usage and cost visible in the Nexus session timeline by connecting
 [Helicone](https://helicone.ai) -- an LLM observability proxy -- to the Nexus
@@ -251,9 +263,6 @@ automatically based on your project configuration.
 
 ```
 nexus-runtime-plugins/
-  200-cost-control/
-    nexus-cost-control.ts      -- plugin source
-    README.md
   600-attribution-headers/
     nexus-attribution-headers.ts -- plugin source
     README.md
@@ -279,6 +288,13 @@ nexus-runtime-plugins/
       types.ts
       detect.ts
       format.ts
+    cost-control/
+      types.ts
+      config.ts
+      state.ts
+      helicone.ts
+      format.ts
+      api.ts
   adapters/                        -- ADR-C05: per-runtime hook wiring
     opencode/
       session-guard/
@@ -293,6 +309,9 @@ nexus-runtime-plugins/
       routing-guard/
         nexus-routing-guard.ts
         README.md
+      cost-control/
+        nexus-cost-control.ts
+        README.md
     claude-code/
       session-guard/
         nexus-session-guard.ts
@@ -306,16 +325,20 @@ nexus-runtime-plugins/
       routing-guard/
         nexus-routing-guard.ts
         README.md
+      cost-control/
+        nexus-cost-control.ts
+        README.md
 ```
 
-Session Guard, Headroom Intercept, Compaction Plus, and Routing Guard are the
-ADR-C05 Track B2 plugins migrated so far: out of their flat
+Session Guard, Headroom Intercept, Compaction Plus, Routing Guard, and Cost
+Control are the ADR-C05 Track B2 plugins migrated so far: out of their flat
 `400-session-guard/` / `300-headroom-intercept/` / `100-compaction-plus/` /
-`500-routing-guard/` directories into `core/` +
-`adapters/opencode/` + `adapters/claude-code/`. The remaining plugin will
-follow the same pattern as Track B2 proceeds (`200-cost-control` next;
-`600-attribution-headers` is explicitly not ported to
-Claude Code per ADR-C08).
+`500-routing-guard/` / `200-cost-control/` directories into `core/` +
+`adapters/opencode/` + `adapters/claude-code/`. `600-attribution-headers` is
+explicitly not ported to Claude Code per ADR-C08 and stays as the only flat
+plugin directory. With Cost Control migrated, Track B2's per-plugin
+restructure is complete pending the follow-ups flagged in each adapter's
+README (see Dispatch `dc5fdf9a`, NEXUS-APP).
 
 ## Requirements
 

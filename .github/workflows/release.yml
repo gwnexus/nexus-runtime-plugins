@@ -41,8 +41,10 @@ jobs:
         run: |
           mkdir -p dist
 
-          # Individual plugin zips (plugin source + README)
-          for dir in 200-cost-control; do
+          # Individual plugin zips (plugin source + README) — remaining flat,
+          # non-migrated plugin(s). 600-attribution-headers is explicitly not
+          # ported to Claude Code per ADR-C08 and stays flat indefinitely.
+          for dir in 600-attribution-headers; do
             plugin_name=$(basename "$dir")
             zip -j "dist/${plugin_name}.zip" "${dir}"/*.ts "${dir}"/README.md
           done
@@ -74,10 +76,17 @@ jobs:
             adapters/claude-code/routing-guard/README.md \
             core/routing-guard/*.ts \
             core/logger.ts
+          zip -j dist/cost-control.zip \
+            adapters/opencode/cost-control/nexus-cost-control.ts \
+            adapters/opencode/cost-control/README.md \
+            adapters/claude-code/cost-control/nexus-cost-control.ts \
+            adapters/claude-code/cost-control/README.md \
+            core/cost-control/*.ts \
+            core/logger.ts \
+            core/state-store.ts
 
           # Combined bundle with all plugins
           zip -j dist/nexus-runtime-plugins-all.zip \
-            200-cost-control/nexus-cost-control.ts \
             adapters/opencode/session-guard/nexus-session-guard.ts \
             adapters/claude-code/session-guard/nexus-session-guard.ts \
             adapters/opencode/headroom-intercept/nexus-headroom-intercept.ts \
@@ -86,12 +95,15 @@ jobs:
             adapters/claude-code/compaction-plus/nexus-compaction-plus.ts \
             adapters/opencode/routing-guard/nexus-routing-guard.ts \
             adapters/claude-code/routing-guard/nexus-routing-guard.ts \
+            adapters/opencode/cost-control/nexus-cost-control.ts \
+            adapters/claude-code/cost-control/nexus-cost-control.ts \
             core/logger.ts \
             core/state-store.ts \
             core/session-guard/logic.ts \
             core/headroom-intercept/*.ts \
             core/compaction-plus/*.ts \
-            core/routing-guard/*.ts
+            core/routing-guard/*.ts \
+            core/cost-control/*.ts
 
       - name: Upload artifacts (branch push)
         if: github.ref == 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')
@@ -108,9 +120,10 @@ jobs:
           name: v${{ steps.version.outputs.version }}
           generate_release_notes: true
           files: |
-            dist/200-cost-control.zip
+            dist/600-attribution-headers.zip
             dist/session-guard.zip
             dist/headroom-intercept.zip
             dist/compaction-plus.zip
             dist/routing-guard.zip
+            dist/cost-control.zip
             dist/nexus-runtime-plugins-all.zip

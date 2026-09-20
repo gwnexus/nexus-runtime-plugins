@@ -1,4 +1,4 @@
-# nexus-cost-control
+# nexus-cost-control (OpenCode adapter)
 
 An [OpenCode](https://opencode.ai) plugin that surfaces token usage and cost
 visibility inside [Nexus](https://nexus.gatewarden.eu) sessions.
@@ -10,6 +10,14 @@ visibility inside [Nexus](https://nexus.gatewarden.eu) sessions.
 > **Roadmap — v2.0.0:** A rewrite is planned that reads cost data directly from
 > OpenCode native message data, removing the Helicone dependency entirely. Until
 > that ships, Helicone is required for cost tracking.
+
+> Migrated to the ADR-C05 `core/` + `adapters/` structure (Track B2, the
+> last plugin in this restructure pass). Credential resolution, state
+> extraction, the Helicone client, formatting, and the Nexus API call now
+> live in [`core/cost-control/`](../../../core/cost-control), shared with
+> the [Claude Code adapter](../../claude-code/cost-control). This file
+> documents the OpenCode-specific wiring (message/part parsing, `session.idle`
+> hook, tool registration).
 
 ## What this plugin does
 
@@ -156,12 +164,14 @@ Tracked via Helicone · nexus-cost-control v1.0.1
 ## Testing
 
 ```bash
-npm test -- 200-cost-control
+npm test -- adapters/opencode/cost-control core/cost-control
 ```
 
-6 unit tests covering hook registration, tool output, event routing, and
-config handling.
+6 unit tests for this adapter (hook registration, tool output, event
+routing, config handling), plus 17 unit tests for the shared core modules
+(state extraction, config resolution, Helicone client, formatting, API
+call).
 
 ## License
 
-Apache-2.0 — Copyright 2025-2026 RELICFROG Holding UG, contributed by Patrick Paechatz. See [LICENSE](../LICENSE).
+Apache-2.0 — Copyright 2025-2026 RELICFROG Holding UG, contributed by Patrick Paechatz. See [LICENSE](../../../LICENSE).
