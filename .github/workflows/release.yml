@@ -67,6 +67,13 @@ jobs:
             adapters/claude-code/compaction-plus/README.md \
             core/compaction-plus/*.ts \
             core/logger.ts
+          zip -j dist/routing-guard.zip \
+            adapters/opencode/routing-guard/nexus-routing-guard.ts \
+            adapters/opencode/routing-guard/README.md \
+            adapters/claude-code/routing-guard/nexus-routing-guard.ts \
+            adapters/claude-code/routing-guard/README.md \
+            core/routing-guard/*.ts \
+            core/logger.ts
 
           # Combined bundle with all plugins
           zip -j dist/nexus-runtime-plugins-all.zip \
@@ -77,11 +84,14 @@ jobs:
             adapters/claude-code/headroom-intercept/nexus-headroom-intercept.ts \
             adapters/opencode/compaction-plus/nexus-compaction-plus.ts \
             adapters/claude-code/compaction-plus/nexus-compaction-plus.ts \
+            adapters/opencode/routing-guard/nexus-routing-guard.ts \
+            adapters/claude-code/routing-guard/nexus-routing-guard.ts \
             core/logger.ts \
             core/state-store.ts \
             core/session-guard/logic.ts \
             core/headroom-intercept/*.ts \
-            core/compaction-plus/*.ts
+            core/compaction-plus/*.ts \
+            core/routing-guard/*.ts
 
       - name: Upload artifacts (branch push)
         if: github.ref == 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')
@@ -102,4 +112,5 @@ jobs:
             dist/session-guard.zip
             dist/headroom-intercept.zip
             dist/compaction-plus.zip
+            dist/routing-guard.zip
             dist/nexus-runtime-plugins-all.zip

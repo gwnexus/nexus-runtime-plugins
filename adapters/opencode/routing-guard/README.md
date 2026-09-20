@@ -1,4 +1,4 @@
-# nexus-routing-guard
+# nexus-routing-guard (OpenCode adapter)
 
 An [OpenCode](https://opencode.ai) plugin that detects model routing divergence
 between Nexus-configured agents and the effective merged provider/model
@@ -8,6 +8,13 @@ catalog of the running OpenCode instance, for the
 **Current version:** `v1.0.0`
 **Requires:** none beyond `PluginInput.client` (no Nexus MCP session required)
 **Ref:** ADR-0001, dispatch `46bc744a-17c6-4aa1-9d8f-7d6f5ad881a4` (NEXUS-APP)
+
+> Migrated to the ADR-C05 `core/` + `adapters/` structure (Track B2). The
+> pure divergence-detection function and banner/context formatters live in
+> [`core/routing-guard/`](../../../core/routing-guard), shared with the
+> [Claude Code adapter](../../claude-code/routing-guard). This file documents
+> the OpenCode-specific wiring (`client.config.providers()` /
+> `client.app.agents()` live catalog query, hook registration).
 
 ## What it does
 
@@ -108,15 +115,14 @@ Ensure `.opencode/package.json` includes the plugin SDK:
 ## Testing
 
 ```bash
-npm test -- 500-routing-guard
+npm test -- adapters/opencode/routing-guard core/routing-guard
 ```
 
-16 unit tests covering the pure divergence-detection function (clean config,
-unknown provider, unknown model, agents without an explicit model, multiple
-divergent agents), plugin behavior (silent-when-clean, one-shot banner,
-banner suppression on subsequent calls, MCP content-array output shape,
-system-prompt injection), and failure modes (provider/agent API errors
-degrade silently, env var opt-out skips all API calls).
+16 unit tests for this adapter (plugin behavior: silent-when-clean, one-shot
+banner, banner suppression, MCP content-array shape, system-prompt
+injection, API-failure degradation, env-var opt-out), plus 7 unit tests for
+the shared core modules (pure divergence detection, banner/context
+formatting).
 
 ## Logs
 
@@ -129,4 +135,4 @@ tool-output banner).
 
 ## License
 
-Apache-2.0 — Copyright 2025-2026 RELICFROG Holding UG, contributed by Patrick Paechatz. See [LICENSE](../LICENSE).
+Apache-2.0 — Copyright 2025-2026 RELICFROG Holding UG, contributed by Patrick Paechatz. See [LICENSE](../../../LICENSE).

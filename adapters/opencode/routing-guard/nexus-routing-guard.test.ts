@@ -145,7 +145,7 @@ describe("NexusRoutingGuard plugin", () => {
 
   it("returns the expected hooks", async () => {
     const client = makeClient({});
-    const hooks = await NexusRoutingGuard({
+    const hooks: any = await NexusRoutingGuard({
       client,
       directory: "/tmp/test-project",
     } as any);
@@ -163,7 +163,7 @@ describe("NexusRoutingGuard plugin", () => {
         },
       ],
     });
-    const hooks = await NexusRoutingGuard({
+    const hooks: any = await NexusRoutingGuard({
       client,
       directory: "/tmp/test-project",
     } as any);
@@ -184,7 +184,7 @@ describe("NexusRoutingGuard plugin", () => {
         },
       ],
     });
-    const hooks = await NexusRoutingGuard({
+    const hooks: any = await NexusRoutingGuard({
       client,
       directory: "/tmp/test-project",
     } as any);
@@ -206,7 +206,7 @@ describe("NexusRoutingGuard plugin", () => {
         },
       ],
     });
-    const hooks = await NexusRoutingGuard({
+    const hooks: any = await NexusRoutingGuard({
       client,
       directory: "/tmp/test-project",
     } as any);
@@ -228,7 +228,7 @@ describe("NexusRoutingGuard plugin", () => {
         },
       ],
     });
-    const hooks = await NexusRoutingGuard({
+    const hooks: any = await NexusRoutingGuard({
       client,
       directory: "/tmp/test-project",
     } as any);
@@ -256,7 +256,7 @@ describe("NexusRoutingGuard plugin", () => {
         },
       ],
     });
-    const hooks = await NexusRoutingGuard({
+    const hooks: any = await NexusRoutingGuard({
       client,
       directory: "/tmp/test-project",
     } as any);
@@ -270,7 +270,7 @@ describe("NexusRoutingGuard plugin", () => {
 
   it("degrades silently when client.config.providers() fails, never blocking the tool call", async () => {
     const client = makeClient({ providersError: true });
-    const hooks = await NexusRoutingGuard({
+    const hooks: any = await NexusRoutingGuard({
       client,
       directory: "/tmp/test-project",
     } as any);
@@ -284,7 +284,7 @@ describe("NexusRoutingGuard plugin", () => {
 
   it("degrades silently when client.app.agents() fails, never blocking the tool call", async () => {
     const client = makeClient({ agentsError: true });
-    const hooks = await NexusRoutingGuard({
+    const hooks: any = await NexusRoutingGuard({
       client,
       directory: "/tmp/test-project",
     } as any);
@@ -307,7 +307,7 @@ describe("NexusRoutingGuard plugin", () => {
         },
       ],
     });
-    const hooks = await NexusRoutingGuard({
+    const hooks: any = await NexusRoutingGuard({
       client,
       directory: "/tmp/test-project",
     } as any);
@@ -328,7 +328,7 @@ describe("NexusRoutingGuard plugin", () => {
         },
       ],
     });
-    const hooks = await NexusRoutingGuard({
+    const hooks: any = await NexusRoutingGuard({
       client,
       directory: "/tmp/test-project",
     } as any);
@@ -350,7 +350,7 @@ describe("NexusRoutingGuard plugin", () => {
         },
       ],
     });
-    const hooks = await NexusRoutingGuard({
+    const hooks: any = await NexusRoutingGuard({
       client,
       directory: "/tmp/test-project",
     } as any);

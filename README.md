@@ -8,9 +8,10 @@
 OpenCode plugins for the [Nexus](https://nexus.gatewarden.eu) platform. Under
 ADR-C05, this repo is migrating to a runtime-neutral `core/` + `adapters/`
 structure so plugins can also run under Claude Code; `nexus-session-guard`,
-`nexus-headroom-intercept`, and `nexus-compaction-plus` are migrated so far
-(OpenCode + Claude Code adapters both available). The remaining plugins below
-are still OpenCode-only until their own migration lands.
+`nexus-headroom-intercept`, `nexus-compaction-plus`, and
+`nexus-routing-guard` are migrated so far (OpenCode + Claude Code adapters
+both available). The remaining plugin below is still OpenCode-only until its
+own migration lands.
 
 These plugins extend the coding agent with deep Nexus integration. Each plugin
 targets a specific problem in the agent lifecycle: session continuity across
@@ -30,7 +31,7 @@ auto-discovery mechanism (`.opencode/plugins/`). Migrated plugins (see
 | [**Cost Control**](./200-cost-control/README.md) | `v1.0.1` | Token usage and cost tracking via native message data |
 | [**Headroom Intercept**](./adapters/opencode/headroom-intercept/README.md) | `v0.5.14` | Pre-injection context compression for Nexus MCP tool outputs (OpenCode + Claude Code adapters) |
 | [**Session Guard**](./adapters/opencode/session-guard/README.md) | `v1.1.2` | Enforces session append discipline after code-changing tool calls (OpenCode + Claude Code adapters) |
-| [**Routing Guard**](./500-routing-guard/README.md) | `v1.0.0` | Detects model routing divergence between Nexus config and the effective OpenCode provider catalog |
+| [**Routing Guard**](./adapters/opencode/routing-guard/README.md) | `v1.0.0` | Detects model routing divergence between Nexus config and the effective provider catalog (OpenCode + Claude Code adapters) |
 | [**Attribution Headers**](./600-attribution-headers/README.md) | `v1.0.0` | Injects session/actor attribution headers on outgoing requests to the Nexus gateway provider |
 
 ## Compaction Plus
@@ -158,7 +159,19 @@ before proceeding.
 
 ## Routing Guard
 
-**`v1.0.0` · [`500-routing-guard`](./500-routing-guard)**
+**`v1.0.0` · [`adapters/opencode/routing-guard`](./adapters/opencode/routing-guard) (OpenCode) · [`adapters/claude-code/routing-guard`](./adapters/claude-code/routing-guard) (Claude Code)**
+
+> Migrated to the ADR-C05 `core/` + `adapters/` structure. The pure
+> divergence-detection function lives in
+> [`core/routing-guard/`](./core/routing-guard), shared between both
+> adapters. The Claude Code adapter is `partial` parity per
+> `capability-matrix.v1.json`: there is no continuous in-session validation
+> equivalent to OpenCode's `experimental.chat.system.transform`, so the
+> Claude Code adapter only validates once at `SessionStart` -- this gap is
+> disclosed rather than worked around. It also requires the provider
+> catalog and agent routing table as JSON files (no equivalent to
+> OpenCode's `client.config.providers()`/`client.app.agents()` SDK calls
+> exists in Claude Code); see the Claude Code adapter README.
 
 Nexus writes agent-to-provider/model routing into a project's
 `opencode.json`, but that routing can silently diverge from what the running
@@ -241,9 +254,6 @@ nexus-runtime-plugins/
   200-cost-control/
     nexus-cost-control.ts      -- plugin source
     README.md
-  500-routing-guard/
-    nexus-routing-guard.ts     -- plugin source
-    README.md
   600-attribution-headers/
     nexus-attribution-headers.ts -- plugin source
     README.md
@@ -265,6 +275,10 @@ nexus-runtime-plugins/
       config.ts
       state.ts
       api.ts
+    routing-guard/
+      types.ts
+      detect.ts
+      format.ts
   adapters/                        -- ADR-C05: per-runtime hook wiring
     opencode/
       session-guard/
@@ -276,6 +290,9 @@ nexus-runtime-plugins/
       compaction-plus/
         nexus-compaction-plus.ts
         README.md
+      routing-guard/
+        nexus-routing-guard.ts
+        README.md
     claude-code/
       session-guard/
         nexus-session-guard.ts
@@ -286,14 +303,18 @@ nexus-runtime-plugins/
       compaction-plus/
         nexus-compaction-plus.ts
         README.md
+      routing-guard/
+        nexus-routing-guard.ts
+        README.md
 ```
 
-Session Guard, Headroom Intercept, and Compaction Plus are the ADR-C05 Track
-B2 plugins migrated so far: out of their flat `400-session-guard/` /
-`300-headroom-intercept/` / `100-compaction-plus/` directories into `core/` +
-`adapters/opencode/` + `adapters/claude-code/`. The remaining plugins will
-follow the same pattern as Track B2 proceeds (`500-routing-guard` next, then
-`200-cost-control`; `600-attribution-headers` is explicitly not ported to
+Session Guard, Headroom Intercept, Compaction Plus, and Routing Guard are the
+ADR-C05 Track B2 plugins migrated so far: out of their flat
+`400-session-guard/` / `300-headroom-intercept/` / `100-compaction-plus/` /
+`500-routing-guard/` directories into `core/` +
+`adapters/opencode/` + `adapters/claude-code/`. The remaining plugin will
+follow the same pattern as Track B2 proceeds (`200-cost-control` next;
+`600-attribution-headers` is explicitly not ported to
 Claude Code per ADR-C08).
 
 ## Requirements
