@@ -23,7 +23,7 @@ plugin is independently installable via the OpenCode auto-discovery mechanism
 | [**Compaction Plus**](./100-compaction-plus/README.md) | `v1.8.1` | Preserves Nexus session context across OpenCode compaction events |
 | [**Cost Control**](./200-cost-control/README.md) | `v1.0.1` | Token usage and cost tracking via native message data |
 | [**Headroom Intercept**](./300-headroom-intercept/README.md) | `v0.5.14` | Pre-injection context compression for Nexus MCP tool outputs |
-| [**Session Guard**](./400-session-guard/README.md) | `v1.1.2` | Enforces session append discipline after code-changing tool calls |
+| [**Session Guard**](./adapters/opencode/session-guard/README.md) | `v1.1.2` | Enforces session append discipline after code-changing tool calls (OpenCode + Claude Code adapters) |
 | [**Routing Guard**](./500-routing-guard/README.md) | `v1.0.0` | Detects model routing divergence between Nexus config and the effective OpenCode provider catalog |
 | [**Attribution Headers**](./600-attribution-headers/README.md) | `v1.0.0` | Injects session/actor attribution headers on outgoing requests to the Nexus gateway provider |
 
@@ -104,7 +104,12 @@ and compression profile. Originals are retrievable via the plugin's own
 
 ## Session Guard
 
-**`v1.1.2` · [`400-session-guard`](./400-session-guard)**
+**`v1.1.2` · [`adapters/opencode/session-guard`](./adapters/opencode/session-guard) (OpenCode) · [`adapters/claude-code/session-guard`](./adapters/claude-code/session-guard) (Claude Code)**
+
+> This plugin has been migrated to the ADR-C05 `core/` + `adapters/` structure
+> as the Track B2 pilot. Shared trigger-detection logic lives in
+> `core/session-guard/logic.ts`; the OpenCode and Claude Code adapters each
+> wire it to their respective runtime hooks.
 
 Agents frequently skip `nexus_session_append` calls after completing work
 packages, leaving gaps in the session audit trail. This plugin detects
@@ -217,16 +222,35 @@ nexus-runtime-plugins/
   300-headroom-intercept/
     nexus-headroom-intercept.ts -- plugin source
     README.md
-  400-session-guard/
-    nexus-session-guard.ts     -- plugin source
-    README.md
   500-routing-guard/
     nexus-routing-guard.ts     -- plugin source
     README.md
   600-attribution-headers/
     nexus-attribution-headers.ts -- plugin source
     README.md
+  core/                            -- ADR-C05: runtime-agnostic shared logic
+    logger.ts
+    state-store.ts
+    session-guard/
+      logic.ts
+  adapters/                        -- ADR-C05: per-runtime hook wiring
+    opencode/
+      session-guard/
+        nexus-session-guard.ts
+        README.md
+    claude-code/
+      session-guard/
+        nexus-session-guard.ts
+        README.md
 ```
+
+Session Guard is the ADR-C05 Track B2 pilot plugin: it has been migrated out
+of `400-session-guard/` into `core/` + `adapters/opencode/` +
+`adapters/claude-code/`. The remaining plugins will follow the same pattern
+as Track B2 proceeds (`300-headroom-intercept` next, then
+`100-compaction-plus`, `500-routing-guard`, `200-cost-control`;
+`600-attribution-headers` is explicitly not ported to Claude Code per
+ADR-C08).
 
 ## Requirements
 

@@ -19,7 +19,8 @@
     "100-compaction-plus/**/*.ts",
     "200-cost-control/**/*.ts",
     "300-headroom-intercept/**/*.ts",
-    "400-session-guard/**/*.ts"
+    "core/**/*.ts",
+    "adapters/**/*.ts"
   ],
   "exclude": [
     "node_modules",

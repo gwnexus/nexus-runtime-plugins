@@ -46,6 +46,10 @@ Copy into your project's OpenCode plugins directory:
 cp nexus-session-guard.ts /path/to/your-project/.opencode/plugins/
 ```
 
+Note: this adapter imports shared logic from `core/`. If copying standalone,
+also copy `core/logger.ts` and `core/session-guard/logic.ts` alongside it
+(adjusting the relative import paths), or install from the full repo checkout.
+
 Ensure `.opencode/package.json` includes the plugin SDK:
 
 ```json
@@ -59,7 +63,7 @@ Ensure `.opencode/package.json` includes the plugin SDK:
 ## Testing
 
 ```bash
-npm test -- 400-session-guard
+npm test -- adapters/opencode/session-guard
 ```
 
 17 unit tests covering trigger detection, reminder injection, state machine
@@ -75,4 +79,4 @@ See ADR-0066: Session Guard Plugin (`d5f0735d-bc48-44c9-be2a-96753206a264`, NEXU
 
 ## License
 
-Apache-2.0 — Copyright 2025-2026 RELICFROG Holding UG, contributed by Patrick Paechatz. See [LICENSE](../LICENSE).
+Apache-2.0 — Copyright 2025-2026 RELICFROG Holding UG, contributed by Patrick Paechatz. See [LICENSE](../../../LICENSE).

@@ -42,17 +42,29 @@ jobs:
           mkdir -p dist
 
           # Individual plugin zips (plugin source + README)
-          for dir in 100-compaction-plus 200-cost-control 300-headroom-intercept 400-session-guard; do
+          for dir in 100-compaction-plus 200-cost-control 300-headroom-intercept; do
             plugin_name=$(basename "$dir")
             zip -j "dist/${plugin_name}.zip" "${dir}"/*.ts "${dir}"/README.md
           done
+          zip -j dist/session-guard.zip \
+            adapters/opencode/session-guard/nexus-session-guard.ts \
+            adapters/opencode/session-guard/README.md \
+            adapters/claude-code/session-guard/nexus-session-guard.ts \
+            adapters/claude-code/session-guard/README.md \
+            core/logger.ts \
+            core/state-store.ts \
+            core/session-guard/logic.ts
 
           # Combined bundle with all plugins
           zip -j dist/nexus-runtime-plugins-all.zip \
             100-compaction-plus/nexus-compaction-plus.ts \
             200-cost-control/nexus-cost-control.ts \
             300-headroom-intercept/nexus-headroom-intercept.ts \
-            400-session-guard/nexus-session-guard.ts
+            adapters/opencode/session-guard/nexus-session-guard.ts \
+            adapters/claude-code/session-guard/nexus-session-guard.ts \
+            core/logger.ts \
+            core/state-store.ts \
+            core/session-guard/logic.ts
 
       - name: Upload artifacts (branch push)
         if: github.ref == 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')
@@ -72,5 +84,5 @@ jobs:
             dist/100-compaction-plus.zip
             dist/200-cost-control.zip
             dist/300-headroom-intercept.zip
-            dist/400-session-guard.zip
+            dist/session-guard.zip
             dist/nexus-runtime-plugins-all.zip
