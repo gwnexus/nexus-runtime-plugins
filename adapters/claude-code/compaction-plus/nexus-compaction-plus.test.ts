@@ -104,7 +104,7 @@ describe("compaction-plus Claude Code adapter", () => {
       expect(result).toBeNull()
     })
 
-    it("returns additionalContext when Nexus state is found", () => {
+    it("always returns null (additionalContext is not a supported PreCompact output field) but still logs detected state", () => {
       const lines = [
         transcriptLine({
           message: {
@@ -122,29 +122,29 @@ describe("compaction-plus Claude Code adapter", () => {
       vi.mocked(readFileSync).mockReturnValue(lines.join("\n"))
 
       const result = handlePreCompact({ transcript_path: "/tmp/t.jsonl" }, logger)
-      expect(result).not.toBeNull()
-      const payload = result as any
-      expect(payload.hookSpecificOutput.hookEventName).toBe("PreCompact")
-      expect(payload.hookSpecificOutput.additionalContext).toContain("s1")
-      expect(payload.hookSpecificOutput.additionalContext).toContain("Nexus Platform Session Context")
+      expect(result).toBeNull()
+      expect(logs.some(([, msg]) => msg.includes("session=s1"))).toBe(true)
     })
   })
 
   describe("handlePostCompact", () => {
     it("skips recording when no Nexus config is available", async () => {
       vi.mocked(getNexusConfig).mockReturnValue(null)
-      await handlePostCompact({ cwd: "/tmp/proj", summary: "some summary" }, logger)
+      await handlePostCompact({ cwd: "/tmp/proj", compact_summary: "some summary" }, logger)
       expect(appendCompactionEntry).not.toHaveBeenCalled()
     })
 
     it("skips recording when no Nexus session ID is found", async () => {
       vi.mocked(getNexusConfig).mockReturnValue({ apiUrl: "https://nexus.example.com", token: "tok" })
       vi.mocked(readFileSync).mockReturnValue("")
-      await handlePostCompact({ cwd: "/tmp/proj", transcript_path: "/tmp/t.jsonl", summary: "some summary" }, logger)
+      await handlePostCompact(
+        { cwd: "/tmp/proj", transcript_path: "/tmp/t.jsonl", compact_summary: "some summary" },
+        logger,
+      )
       expect(appendCompactionEntry).not.toHaveBeenCalled()
     })
 
-    it("posts a compaction entry using the summary field supplied by the PostCompact hook", async () => {
+    it("posts a compaction entry using the compact_summary field supplied by the PostCompact hook", async () => {
       vi.mocked(getNexusConfig).mockReturnValue({ apiUrl: "https://nexus.example.com", token: "tok" })
       const lines = [
         transcriptLine({
@@ -163,7 +163,7 @@ describe("compaction-plus Claude Code adapter", () => {
       vi.mocked(readFileSync).mockReturnValue(lines.join("\n"))
 
       await handlePostCompact(
-        { cwd: "/tmp/proj", transcript_path: "/tmp/t.jsonl", summary: "## Goal\n\nDo the thing." },
+        { cwd: "/tmp/proj", transcript_path: "/tmp/t.jsonl", compact_summary: "## Goal\n\nDo the thing." },
         logger,
       )
 

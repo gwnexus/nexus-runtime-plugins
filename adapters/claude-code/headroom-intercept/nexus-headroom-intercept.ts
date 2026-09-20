@@ -2,19 +2,35 @@
 /**
  * Nexus Headroom Intercept — Claude Code adapter (ADR-C05, Track B2, Dispatch dc5fdf9a).
  *
- * Capability matrix: `headroom_intercept` = "full" parity target for Claude
- * Code via `PostToolUse` returning an updated tool output. All policy,
- * compression, cache, and credential-resolution logic lives in
+ * Capability matrix: `headroom_intercept` = "full" for Claude Code via
+ * `PostToolUse` returning `hookSpecificOutput.updatedToolOutput`. All
+ * policy, compression, cache, and credential-resolution logic lives in
  * `core/headroom-intercept/*` and is shared verbatim with the OpenCode
  * adapter; this file only handles Claude Code-specific concerns.
  *
- * VERIFY BEFORE PRODUCTION USE: the exact `PostToolUse` output field name
- * for replacing tool output. This adapter emits both
- * `hookSpecificOutput.updatedToolOutput` (per the capability-matrix draft
- * text) and `hookSpecificOutput.additionalContext` as a fallback, since the
- * precise field was not runtime-verified against a live Claude Code install
- * in this pass — see https://code.claude.com/docs/en/hooks and update this
- * adapter (and the capability matrix) once confirmed.
+ * VERIFIED against the official Claude Code hooks reference
+ * (code.claude.com/docs/en/hooks) on 2026-09-20, see Dispatch `dc5fdf9a`
+ * reply from nexus-app: `hookSpecificOutput.updatedToolOutput` is the
+ * correct field to REPLACE tool output (this plugin's actual need —
+ * compression); `additionalContext` is a different field that only ADDS
+ * supplementary text alongside the original result, so it does not do what
+ * we need and is no longer emitted here.
+ *
+ * IMPORTANT CONFIRMED CAVEAT (verbatim from the docs): "The replacement
+ * value must match the tool's output shape. Built-in tools return
+ * structured objects rather than plain strings... For built-in tools, a
+ * value that doesn't match the tool's output schema is ignored and the
+ * original output is used. MCP tool output is passed through without
+ * schema validation." This plugin's policy table
+ * (`core/headroom-intercept/policies.ts`) only ever assigns a `compress`
+ * action to `nexus_`/`headroom_`-prefixed MCP tools; every built-in tool
+ * (`bash`, `read`, `write`, `edit`, `glob`, `grep`, `shell`) is explicitly
+ * `skip`. A plain-string `updatedToolOutput` is therefore always safe here
+ * — this plugin never attempts to replace a built-in tool's structured
+ * output. If the policy table is ever extended to compress a built-in
+ * tool's output, that entry MUST preserve the tool's native output shape
+ * (e.g. `{ stdout, stderr, interrupted, isImage }` for Bash) instead of a
+ * plain string, or the replacement will be silently ignored.
  *
  * Design differences from the OpenCode adapter (both intentional, both
  * disclosed):
@@ -204,9 +220,11 @@ export async function handlePostToolUse(
     return {
       hookSpecificOutput: {
         hookEventName: "PostToolUse",
-        // VERIFY field name against current Claude Code hooks docs (see file header).
+        // Confirmed field name (2026-09-20, official hooks reference). Plain
+        // string is safe: this plugin's policy table never targets built-in
+        // tools (see file header caveat), only nexus_/headroom_-prefixed MCP
+        // tools, whose output is not schema-validated by Claude Code.
         updatedToolOutput: result.compact,
-        additionalContext: result.compact,
       },
     }
   } catch (err) {

@@ -58,11 +58,10 @@ Add to `.claude/settings.json`:
 }
 ```
 
-**Before production use:** verify the hook input/output JSON field names
-(`tool_name`, `tool_input`, `hookSpecificOutput.additionalContext`) against
-the current Claude Code hooks reference — the exact schema has changed
-across Claude Code versions and was not runtime-verified as part of this
-Track B2 pilot.
+**Confirmed (2026-09-20):** `hookSpecificOutput.additionalContext` is the
+correct field for both `PostToolUse` and `UserPromptSubmit`, verified
+against the official Claude Code hooks reference. No changes needed for
+this adapter.
 
 ## Logs
 

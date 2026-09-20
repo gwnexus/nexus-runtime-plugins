@@ -120,7 +120,7 @@ describe("headroom-intercept Claude Code adapter", () => {
       expect(result).toBeNull()
     })
 
-    it("returns updatedToolOutput/additionalContext when HEADROOM_MODE=transform", async () => {
+    it("returns updatedToolOutput when HEADROOM_MODE=transform", async () => {
       const prev = process.env.HEADROOM_MODE
       process.env.HEADROOM_MODE = "transform"
       try {
@@ -133,7 +133,6 @@ describe("headroom-intercept Claude Code adapter", () => {
         const payload = result as any
         expect(payload.hookSpecificOutput.hookEventName).toBe("PostToolUse")
         expect(payload.hookSpecificOutput.updatedToolOutput).toContain("[HEADROOM:v1]")
-        expect(payload.hookSpecificOutput.additionalContext).toBe(payload.hookSpecificOutput.updatedToolOutput)
       } finally {
         process.env.HEADROOM_MODE = prev
       }

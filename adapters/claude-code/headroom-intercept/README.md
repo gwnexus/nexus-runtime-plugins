@@ -3,10 +3,11 @@
 Claude Code hook adapter for `nexus-headroom-intercept`, part of the ADR-C05
 core/adapters restructure (Track B2, Dispatch `dc5fdf9a`).
 
-**Capability matrix status:** `full` parity target (see `headroom_intercept`
-entry in `capability-matrix.v1.json`) — Claude Code's `PostToolUse` hook
-natively supports replacing tool output before the model sees it, which is a
-direct equivalent to OpenCode's `tool.execute.after` mutation.
+**Capability matrix status:** `full` (see `headroom_intercept` entry in
+`capability-matrix.v1.json`) — Claude Code's `PostToolUse` hook natively
+supports replacing tool output before the model sees it via
+`hookSpecificOutput.updatedToolOutput`, confirmed against the official hooks
+reference (code.claude.com/docs/en/hooks) on 2026-09-20.
 
 All policy, compression, cache, and credential-resolution logic lives in
 [`core/headroom-intercept/`](../../../core/headroom-intercept), shared
@@ -40,15 +41,19 @@ file only documents the Claude Code-specific wiring.
    `.nexus/headroom-metrics-state.json` between invocations and flushed as a
    `session_summary` log line on the `Stop` hook, then reset.
 
-## VERIFY BEFORE PRODUCTION USE
+## Confirmed hook output field (2026-09-20)
 
-The exact `PostToolUse` output field name for replacing tool output was not
-runtime-verified against a live Claude Code install in this pass. This
-adapter emits both `hookSpecificOutput.updatedToolOutput` (per the
-capability-matrix draft text) and `hookSpecificOutput.additionalContext` as a
-fallback. Confirm the correct field against
-[the current Claude Code hooks reference](https://code.claude.com/docs/en/hooks)
-and simplify to the one correct field once verified.
+`hookSpecificOutput.updatedToolOutput` is the correct field to replace tool
+output; `additionalContext` is a different field that only adds
+supplementary text alongside the original result and does not replace it,
+so this adapter no longer emits it. **Important confirmed caveat:** for
+built-in tools (Bash, Read, etc.), a replacement value that doesn't match
+the tool's native output schema is silently ignored — this plugin's policy
+table only ever compresses `nexus_`/`headroom_`-prefixed MCP tool output
+(not schema-validated by Claude Code), and explicitly `skip`s every
+built-in tool, so a plain-string `updatedToolOutput` is always safe here. If
+the policy table is ever extended to compress a built-in tool's output, that
+entry must preserve the tool's native output shape instead.
 
 ## Installation
 

@@ -14,11 +14,13 @@
  * per user turn, which is a close but not perfectly identical semantic
  * match to OpenCode's per-message.updated dedup logic.
  *
- * VERIFY BEFORE PRODUCTION USE: the exact hook input/output JSON shape
- * (`tool_name`, `tool_input`, `tool_response` field names, and the
- * `hookSpecificOutput.additionalContext` output field) against the current
- * Claude Code hooks reference at https://code.claude.com/docs/en/hooks —
- * hook schemas have changed across Claude Code versions.
+ * CONFIRMED (2026-09-20, official hooks reference, see Dispatch `dc5fdf9a`
+ * reply from nexus-app): `hookSpecificOutput.additionalContext` is the
+ * correct field for both `PostToolUse` and `UserPromptSubmit` — it adds
+ * supplementary text alongside the tool's actual result (exactly what a
+ * reminder needs), unlike `updatedToolOutput` which replaces the result
+ * entirely (used by headroom-intercept instead). No changes needed; this
+ * adapter's approach matches the documented pattern as originally written.
  *
  * Hook configuration (.claude/settings.json):
  *
@@ -95,9 +97,8 @@ export function handleHookEvent(
       `REMINDER #${state.reminderCount} — tool=${toolName}, user=${state.lastUserTurnIndex}, append=${state.lastAppendTurnIndex}`,
     )
 
-    // Output shape per Claude Code PostToolUse hook contract: additionalContext
-    // is surfaced to the model without blocking the tool result itself.
-    // VERIFY this field name against current docs before relying on it in prod.
+    // Confirmed field (2026-09-20): additionalContext surfaces supplementary
+    // text to the model without replacing the tool's actual result.
     return {
       hookSpecificOutput: {
         hookEventName: "PostToolUse",

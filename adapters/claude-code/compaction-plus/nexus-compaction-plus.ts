@@ -2,24 +2,38 @@
 /**
  * Nexus Compaction Plus — Claude Code adapter (ADR-C05, Track B2, Dispatch dc5fdf9a).
  *
- * Capability matrix: `compaction_plus` = "partial" for Claude Code. Mechanism
- * exists (`PreCompact` / `PostCompact` hooks) and `PostCompact` supplies the
- * generated compact summary directly per the hooks reference, which is
- * actually simpler than OpenCode's two-phase session.compacted +
- * message.updated diffing approach — but interactive vs. `claude -p`
- * (headless) hook behavior has NOT been verified identical in this pass.
+ * Capability matrix: `compaction_plus` = "partial" for Claude Code.
  *
- * Per the dispatch: "please add an integration test covering both modes and
- * pin a minimum Claude Code version if behavior differs" — this is flagged
- * as a required follow-up before claiming full parity.
+ * VERIFIED against the official Claude Code hooks reference
+ * (code.claude.com/docs/en/hooks) on 2026-09-20, see Dispatch `dc5fdf9a`
+ * reply from nexus-app:
  *
- * VERIFY BEFORE PRODUCTION USE:
- *  - The exact `PreCompact`/`PostCompact` hook input JSON shape (this
- *    adapter assumes `transcript_path` points to a JSONL transcript file
- *    with Claude Code's standard message format, and that `PostCompact`
- *    input includes a `summary` field with the generated compact summary —
- *    neither was runtime-verified against a live Claude Code install).
- *  - Interactive vs. headless (`claude -p`) parity (see capability matrix).
+ *  - `PostCompact` supplies the generated summary in a field named
+ *    `compact_summary`, NOT `summary` (bug fixed in this pass — the
+ *    previous version of this file read the wrong field and would have
+ *    silently recorded an empty "Agent Summary" section on every
+ *    compaction).
+ *  - `additionalContext` is NOT a supported output field for `PreCompact`
+ *    or `PostCompact` (confirmed: only ~10 other hook events accept it —
+ *    SessionStart, SubagentStart, UserPromptSubmit, UserPromptExpansion,
+ *    PreToolUse, PostToolUse, PostToolUseFailure, PostToolBatch, Stop,
+ *    SubagentStop, PostModelSwitch). `PreCompact` therefore has NO
+ *    documented mechanism to inject Nexus context before compaction at
+ *    all — `handlePreCompact()` below is now a no-op (logs only) rather
+ *    than attempting a return value the runtime would silently discard.
+ *    This is a genuine, permanent capability gap for Claude Code, not an
+ *    implementation bug: OpenCode's pre-compaction context injection
+ *    (`experimental.session.compacting`) has no Claude Code equivalent.
+ *
+ * `PostCompact` still supplies the generated summary directly, which
+ * remains simpler than OpenCode's two-phase `session.compacted` +
+ * `message.updated` diffing approach for the post-compaction recording
+ * half of this plugin.
+ *
+ * STILL UNVERIFIED (per the dispatch: "please add an integration test
+ * covering both modes and pin a minimum Claude Code version if behavior
+ * differs"): interactive vs. `claude -p` (headless) hook behavior parity.
+ * This remains `partial` until that verification happens.
  *
  * Shared core logic (core/compaction-plus/*) is identical to the OpenCode
  * adapter; only transcript parsing and hook wiring differ here.
@@ -43,7 +57,7 @@
 import { readFileSync, existsSync } from "node:fs"
 import { createFileLogger } from "../../../core/logger.ts"
 import { getNexusConfig } from "../../../core/compaction-plus/config.ts"
-import { extractNexusState, buildNexusContext, cleanCompactedText, buildCompactionSummary } from "../../../core/compaction-plus/state.ts"
+import { extractNexusState, cleanCompactedText, buildCompactionSummary } from "../../../core/compaction-plus/state.ts"
 import { appendCompactionEntry } from "../../../core/compaction-plus/api.ts"
 import type { NormalizedToolCall, NexusState } from "../../../core/compaction-plus/types.ts"
 
@@ -52,8 +66,8 @@ const PLUGIN_META = { name: "nexus-compaction-plus", version: "1.8.1" } as const
 interface ClaudeHookInput {
   cwd?: string
   transcript_path?: string
-  /** PostCompact-only, per the hooks reference: the generated compact summary text. */
-  summary?: string
+  /** PostCompact-only. Confirmed field name (NOT `summary`) against the official hooks reference. */
+  compact_summary?: string
 }
 
 /**
@@ -131,13 +145,20 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString("utf-8")
 }
 
-/** Testable handler for the `pre-compact` mode. */
-export function handlePreCompact(
-  input: ClaudeHookInput,
-  logger: (level: string, message: string) => void,
-): Record<string, unknown> | null {
+/**
+ * Testable handler for the `pre-compact` mode.
+ *
+ * CONFIRMED (2026-09-20, official hooks reference): `additionalContext` is
+ * not a supported `PreCompact` output field, and no other documented
+ * mechanism exists to inject content before compaction on this event. This
+ * handler therefore does not attempt to return an injection payload — it
+ * only extracts and logs the detected Nexus state for diagnostic purposes.
+ * This is a genuine, permanent capability gap for Claude Code (see
+ * capability-matrix.v1.json), not something this adapter can work around.
+ */
+export function handlePreCompact(input: ClaudeHookInput, logger: (level: string, message: string) => void): null {
   if (!input.transcript_path) {
-    logger("warn", "pre-compact: no transcript_path in hook input — skipping context injection")
+    logger("debug", "pre-compact: no transcript_path in hook input")
     return null
   }
 
@@ -145,19 +166,16 @@ export function handlePreCompact(
   const state = extractNexusState(calls, (m) => logger("debug", m))
 
   if (!state.sessionId && !state.projectId) {
-    logger("info", "No Nexus session/project detected — skipping context injection")
-    return null
+    logger("debug", "No Nexus session/project detected in pre-compact transcript")
+  } else {
+    logger(
+      "info",
+      `Pre-compact: detected session=${state.sessionId ?? "unknown"}, project=${state.projectId ?? "unknown"} ` +
+        "(not injectable — PreCompact does not support additionalContext, logged for diagnostics only)",
+    )
   }
 
-  const context = buildNexusContext(state)
-  logger("info", `Context injected: session=${state.sessionId ?? "unknown"}, project=${state.projectId ?? "unknown"}`)
-
-  return {
-    hookSpecificOutput: {
-      hookEventName: "PreCompact",
-      additionalContext: context,
-    },
-  }
+  return null
 }
 
 /** Testable handler for the `post-compact` mode. */
@@ -184,7 +202,7 @@ export async function handlePostCompact(
   }
 
   const time = new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
-  const compactedText = cleanCompactedText(input.summary ?? "")
+  const compactedText = cleanCompactedText(input.compact_summary ?? "")
   const summary = buildCompactionSummary(PLUGIN_META.version, time, compactedText)
 
   try {
@@ -211,8 +229,7 @@ async function main(): Promise<void> {
   const logger = (level: string, message: string) => fileLog(level, message)
 
   if (mode === "pre-compact") {
-    const output = handlePreCompact(input, logger)
-    if (output) process.stdout.write(JSON.stringify(output))
+    handlePreCompact(input, logger)
     process.exit(0)
   }
 
