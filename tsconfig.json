@@ -18,7 +18,6 @@
   "include": [
     "100-compaction-plus/**/*.ts",
     "200-cost-control/**/*.ts",
-    "300-headroom-intercept/**/*.ts",
     "core/**/*.ts",
     "adapters/**/*.ts"
   ],

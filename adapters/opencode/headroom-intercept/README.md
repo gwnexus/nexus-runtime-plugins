@@ -1,4 +1,4 @@
-# nexus-headroom-intercept
+# nexus-headroom-intercept (OpenCode adapter)
 
 Pre-injection context compression for Nexus MCP tool outputs.
 
@@ -8,6 +8,13 @@ compression before tool results enter the agent context window.
 **Current version:** `0.5.14`  
 **Default mode:** `observe` (safe — metrics only, no mutation)  
 **Transform mode:** experimental, requires explicit opt-in and provider-level verification
+
+> Migrated to the ADR-C05 `core/` + `adapters/` structure (Track B2). All
+> policy, compression, cache, and credential-resolution logic now lives in
+> [`core/headroom-intercept/`](../../../core/headroom-intercept), shared with
+> the [Claude Code adapter](../../claude-code/headroom-intercept). This file
+> documents the OpenCode-specific wiring (SDK version gating, output-shape
+> normalization, tool registration).
 
 ## Problem
 
@@ -72,8 +79,10 @@ export HEADROOM_MODE=observe     # metrics only, no mutation (default)
 
 ### Policies
 
-Edit the `POLICIES` object in the plugin source to add or modify tool-specific
-compression rules:
+Edit the `POLICIES` object in
+[`core/headroom-intercept/policies.ts`](../../../core/headroom-intercept/policies.ts)
+to add or modify tool-specific compression rules (shared with the Claude Code
+adapter — changes apply to both runtimes):
 
 ```ts
 const POLICIES = {
@@ -165,13 +174,13 @@ See ADR-0060: Headroom Pre-Injection Compression via OpenCode Plugin.
 ## Testing
 
 ```bash
-npm test -- 300-headroom-intercept
+npm test -- adapters/opencode/headroom-intercept core/headroom-intercept
 ```
 
-18 unit tests covering retrieval tool validation (hash format, missing content),
-policy routing (compress/passthrough/skip), error passthrough, threshold gating,
-and policy coverage assertions for all registered Nexus MCP tools.
+18 unit tests for this adapter (retrieval tool validation, policy routing,
+error passthrough, threshold gating, policy coverage), plus 27 unit tests for
+the shared core modules (policies, compression, cache store, engine).
 
 ## License
 
-Apache-2.0 — Copyright 2025-2026 RELICFROG Holding UG, contributed by Patrick Paechatz. See [LICENSE](../LICENSE).
+Apache-2.0 — Copyright 2025-2026 RELICFROG Holding UG, contributed by Patrick Paechatz. See [LICENSE](../../../LICENSE).
