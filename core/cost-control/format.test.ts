@@ -29,4 +29,19 @@ describe("cost-control core format", () => {
     const summary = formatCostSummary({ ...cost, models: [] }, "1.0.1")
     expect(summary).not.toContain("| Models |")
   })
+
+  it("reports cost as n/a and shows message count for runtime-sourced entries", () => {
+    const runtimeCost: HeliconeSessionCost = {
+      ...cost,
+      totalRequests: 0,
+      costUsd: null,
+      costSource: "runtime",
+      totalMessages: 3,
+    }
+    const summary = formatCostSummary(runtimeCost, "1.0.1")
+    expect(summary).toContain("n/a (subscription — not metered)")
+    expect(summary).toContain("| Assistant messages | 3 |")
+    expect(summary).not.toContain("$0.012345")
+    expect(summary).not.toContain("[Helicone]")
+  })
 })

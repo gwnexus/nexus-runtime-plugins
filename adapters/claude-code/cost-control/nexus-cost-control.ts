@@ -49,9 +49,10 @@ import { getNexusConfig, getHeliconeConfig } from "../../../core/cost-control/co
 import { extractNexusState } from "../../../core/cost-control/state.ts"
 import { queryHeliconeSession } from "../../../core/cost-control/helicone.ts"
 import { appendCostEntry } from "../../../core/cost-control/api.ts"
+import { emptyRuntimeUsage, buildRuntimeCostEntry, type RuntimeUsage } from "../../../core/cost-control/runtime-usage.ts"
 import type { NormalizedToolCall } from "../../../core/cost-control/types.ts"
 
-const PLUGIN_META = { name: "nexus-cost-control", version: "1.0.1" } as const
+const PLUGIN_META = { name: "nexus-cost-control", version: "1.1.0" } as const
 const STATE_FILE = "cost-control-state.json"
 
 interface CostControlState {
@@ -132,6 +133,55 @@ export function parseClaudeTranscript(transcriptPath: string): NormalizedToolCal
 
 const IDLE_DEBOUNCE_MS = 5 * 60 * 1000 // 5 minutes — same window as the OpenCode adapter
 
+/**
+ * Aggregate token usage directly from a Claude Code transcript's assistant
+ * message `usage` blocks, used as a fallback cost-control source when
+ * Helicone has no data for a session (Dispatch 515186c1) -- e.g. Claude Max
+ * sessions that talk directly to Anthropic and never pass through the
+ * Helicone gateway. No cost figure is derivable here -- only Helicone knows
+ * the metered dollar cost.
+ */
+export function aggregateClaudeUsage(transcriptPath: string): RuntimeUsage {
+  const usage = emptyRuntimeUsage()
+  if (!existsSync(transcriptPath)) return usage
+
+  let raw: string
+  try {
+    raw = readFileSync(transcriptPath, "utf-8")
+  } catch {
+    return usage
+  }
+
+  const modelsSet = new Set<string>()
+
+  for (const line of raw.split("\n")) {
+    if (!line.trim()) continue
+    let entry: any
+    try {
+      entry = JSON.parse(line)
+    } catch {
+      continue
+    }
+
+    const message = entry?.message
+    if (!message || message.role !== "assistant") continue
+
+    usage.totalMessages += 1
+    const u = message.usage
+    if (u) {
+      usage.tokensInput += u.input_tokens ?? 0
+      usage.tokensOutput += u.output_tokens ?? 0
+      usage.tokensCacheRead += u.cache_read_input_tokens ?? 0
+      usage.tokensCacheWrite += u.cache_creation_input_tokens ?? 0
+    }
+    if (message.model) modelsSet.add(message.model)
+  }
+
+  usage.totalTokens = usage.tokensInput + usage.tokensOutput
+  usage.models = Array.from(modelsSet)
+  return usage
+}
+
 /** Testable handler for the `stop` mode. */
 export async function handleStop(
   input: ClaudeHookInput,
@@ -167,22 +217,32 @@ export async function handleStop(
   }
 
   const cost = await queryHeliconeSession(heliconeConfig, nexusState.sessionId, (level, msg) => logger(level, msg))
-  if (!cost) {
-    logger("info", `No Helicone data for session ${nexusState.sessionId} — skipping`)
-    return
+  let entry = cost
+  if (!entry) {
+    const usage = aggregateClaudeUsage(input.transcript_path)
+    if (usage.totalMessages === 0) {
+      logger("info", `No Helicone data for session ${nexusState.sessionId} — skipping`)
+      return
+    }
+    entry = buildRuntimeCostEntry(nexusState.sessionId, usage)
+    logger(
+      "info",
+      `No Helicone data for session ${nexusState.sessionId} — falling back to runtime token aggregation (cost_source=runtime)`,
+    )
   }
 
-  if (state.lastAppendedTokens !== null && cost.totalTokens === state.lastAppendedTokens) {
-    logger("debug", `Stop — skipping (no token delta, still ${cost.totalTokens})`)
+  if (state.lastAppendedTokens !== null && entry.totalTokens === state.lastAppendedTokens) {
+    logger("debug", `Stop — skipping (no token delta, still ${entry.totalTokens})`)
     return
   }
 
   try {
-    await appendCostEntry(nexusConfig, nexusState.sessionId, cost, PLUGIN_META, (level, msg) => logger(level, msg))
+    await appendCostEntry(nexusConfig, nexusState.sessionId, entry, PLUGIN_META, (level, msg) => logger(level, msg))
     state.lastAppendAt = Date.now()
-    state.lastAppendedTokens = cost.totalTokens
+    state.lastAppendedTokens = entry.totalTokens
     saveState(directory, STATE_FILE, state)
-    logger("info", `Cost entry recorded — $${cost.costUsd.toFixed(6)} / ${cost.totalTokens} tokens`)
+    const costLabel = entry.costUsd === null ? "n/a (runtime)" : `$${entry.costUsd.toFixed(6)}`
+    logger("info", `Cost entry recorded — ${costLabel} / ${entry.totalTokens} tokens`)
   } catch (err) {
     logger("error", `Failed to record cost entry: ${err}`)
   }

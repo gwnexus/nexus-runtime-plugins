@@ -28,7 +28,7 @@ auto-discovery mechanism (`.opencode/plugins/`). Migrated plugins (see
 | Plugin | Version | Description |
 | --- | --- | --- |
 | [**Compaction Plus**](./adapters/opencode/compaction-plus/README.md) | `v1.8.1` | Preserves Nexus session context across compaction events (OpenCode + Claude Code adapters) |
-| [**Cost Control**](./adapters/opencode/cost-control/README.md) | `v1.0.1` | Token usage and cost tracking via Helicone (OpenCode + Claude Code adapters) |
+| [**Cost Control**](./adapters/opencode/cost-control/README.md) | `v1.1.0` | Token usage and cost tracking via Helicone (OpenCode + Claude Code adapters) |
 | [**Headroom Intercept**](./adapters/opencode/headroom-intercept/README.md) | `v0.5.14` | Pre-injection context compression for Nexus MCP tool outputs (OpenCode + Claude Code adapters) |
 | [**Session Guard**](./adapters/opencode/session-guard/README.md) | `v1.1.2` | Enforces session append discipline after code-changing tool calls (OpenCode + Claude Code adapters) |
 | [**Routing Guard**](./adapters/opencode/routing-guard/README.md) | `v1.0.0` | Detects model routing divergence between Nexus config and the effective provider catalog (OpenCode + Claude Code adapters) |
@@ -67,7 +67,7 @@ This plugin solves that by hooking directly into the compaction lifecycle:
 
 ## Cost Control
 
-**`v1.0.1` · [`adapters/opencode/cost-control`](./adapters/opencode/cost-control) (OpenCode) · [`adapters/claude-code/cost-control`](./adapters/claude-code/cost-control) (Claude Code)**
+**`v1.1.0` · [`adapters/opencode/cost-control`](./adapters/opencode/cost-control) (OpenCode) · [`adapters/claude-code/cost-control`](./adapters/claude-code/cost-control) (Claude Code)**
 
 > Migrated to the ADR-C05 `core/` + `adapters/` structure (Track B2, the
 > last plugin in this restructure pass). Credential resolution, state

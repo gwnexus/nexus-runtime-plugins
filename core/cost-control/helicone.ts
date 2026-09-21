@@ -91,6 +91,7 @@ export async function queryHeliconeSession(
       tokensCacheWrite,
       totalTokens: tokensInput + tokensOutput,
       costUsd: Math.round(costUsd * 1_000_000) / 1_000_000, // 6 decimal places
+      costSource: "helicone",
       models: Array.from(modelsSet),
       queriedAt: new Date().toISOString(),
     }

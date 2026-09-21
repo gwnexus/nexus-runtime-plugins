@@ -20,6 +20,23 @@ vi.mock("node:fs", async () => {
 
 import { NexusCostControl } from "./nexus-cost-control.ts"
 
+vi.mock("../../../core/cost-control/config.ts", () => ({
+  getNexusConfig: vi.fn(),
+  getHeliconeConfig: vi.fn(),
+}))
+
+vi.mock("../../../core/cost-control/helicone.ts", () => ({
+  queryHeliconeSession: vi.fn(),
+}))
+
+vi.mock("../../../core/cost-control/api.ts", () => ({
+  appendCostEntry: vi.fn().mockResolvedValue(undefined),
+}))
+
+import { getNexusConfig, getHeliconeConfig } from "../../../core/cost-control/config.ts"
+import { queryHeliconeSession } from "../../../core/cost-control/helicone.ts"
+import { appendCostEntry } from "../../../core/cost-control/api.ts"
+
 function makeClient() {
   return {
     app: { log: vi.fn().mockResolvedValue(undefined) },
@@ -36,6 +53,10 @@ describe("NexusCostControl", () => {
 
   beforeEach(async () => {
     client = makeClient()
+    vi.mocked(getNexusConfig).mockReset()
+    vi.mocked(getHeliconeConfig).mockReset()
+    vi.mocked(queryHeliconeSession).mockReset()
+    vi.mocked(appendCostEntry).mockReset().mockResolvedValue(undefined)
     hooks = await NexusCostControl({ client, directory: "/tmp/test-project" } as any)
   })
 
@@ -79,6 +100,92 @@ describe("NexusCostControl", () => {
       })
       // Should not fetch messages (no config)
       expect(client.session.messages).not.toHaveBeenCalled()
+    })
+
+    it("falls back to runtime token aggregation when Helicone is configured but returns no data", async () => {
+      const nexusConfig = { apiUrl: "https://nexus.example.com", token: "tok" }
+      const heliconeConfig = { apiKey: "sk-helicone" }
+      vi.mocked(getNexusConfig).mockReturnValue(nexusConfig)
+      vi.mocked(getHeliconeConfig).mockReturnValue(heliconeConfig)
+      vi.mocked(queryHeliconeSession).mockResolvedValue(null)
+      hooks = await NexusCostControl({ client, directory: "/tmp/test-project" } as any)
+
+      client.session.messages.mockResolvedValue({
+        data: [
+          {
+            info: {
+              role: "assistant",
+              modelID: "claude-opus-4",
+              tokens: { input: 200, output: 80, cache: { read: 10, write: 5 } },
+            },
+            parts: [
+              {
+                type: "tool",
+                tool: "nexus_session_append",
+                state: { status: "completed", input: { session_id: "nexus-sess-1" } },
+              },
+            ],
+          },
+        ],
+      })
+
+      await hooks.event({
+        event: { type: "session.idle", properties: { sessionID: "oc-sess-1" } },
+      })
+
+      expect(appendCostEntry).toHaveBeenCalledWith(
+        nexusConfig,
+        "nexus-sess-1",
+        expect.objectContaining({ costUsd: null, costSource: "runtime", totalTokens: 280, totalMessages: 1 }),
+        expect.objectContaining({ name: "nexus-cost-control" }),
+        expect.any(Function),
+      )
+    })
+
+    it("skips entirely on session.idle when Helicone has no data and no assistant messages exist", async () => {
+      const nexusConfig = { apiUrl: "https://nexus.example.com", token: "tok" }
+      const heliconeConfig = { apiKey: "sk-helicone" }
+      vi.mocked(getNexusConfig).mockReturnValue(nexusConfig)
+      vi.mocked(getHeliconeConfig).mockReturnValue(heliconeConfig)
+      vi.mocked(queryHeliconeSession).mockResolvedValue(null)
+      hooks = await NexusCostControl({ client, directory: "/tmp/test-project" } as any)
+
+      client.session.messages.mockResolvedValue({
+        data: [
+          {
+            info: { role: "assistant" },
+            parts: [
+              {
+                type: "tool",
+                tool: "nexus_session_append",
+                state: { status: "completed", input: { session_id: "nexus-sess-1" } },
+              },
+            ],
+          },
+        ],
+      })
+      // Assistant message present but with no tokens field at all is still counted
+      // as a message; to truly hit the "skip" branch, drop the assistant role.
+      client.session.messages.mockResolvedValue({
+        data: [
+          {
+            info: { role: "user" },
+            parts: [
+              {
+                type: "tool",
+                tool: "nexus_session_append",
+                state: { status: "completed", input: { session_id: "nexus-sess-1" } },
+              },
+            ],
+          },
+        ],
+      })
+
+      await hooks.event({
+        event: { type: "session.idle", properties: { sessionID: "oc-sess-1" } },
+      })
+
+      expect(appendCostEntry).not.toHaveBeenCalled()
     })
   })
 

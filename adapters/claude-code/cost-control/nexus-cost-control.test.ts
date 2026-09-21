@@ -146,7 +146,7 @@ describe("cost-control Claude Code adapter", () => {
         nexusConfig,
         "s1",
         expect.objectContaining({ totalTokens: 150 }),
-        { name: "nexus-cost-control", version: "1.0.1" },
+        { name: "nexus-cost-control", version: "1.1.0" },
         expect.any(Function),
       )
     })
@@ -187,6 +187,73 @@ describe("cost-control Claude Code adapter", () => {
       // Second call within the debounce window with identical token count — should be skipped
       await handleStop({ cwd: "/tmp/proj", transcript_path: "/tmp/t.jsonl" }, logger)
       expect(appendCostEntry).toHaveBeenCalledTimes(1)
+    })
+
+    it("writes a token-only runtime entry when Helicone returns no data but the transcript has assistant usage", async () => {
+      vi.mocked(getNexusConfig).mockReturnValue(nexusConfig)
+      vi.mocked(getHeliconeConfig).mockReturnValue(heliconeConfig)
+      vi.mocked(queryHeliconeSession).mockResolvedValue(null)
+
+      const lines = [
+        transcriptLine({
+          message: { content: [{ type: "tool_use", id: "c1", name: "nexus_session_create", input: {} }] },
+        }),
+        transcriptLine({
+          message: {
+            content: [
+              { type: "tool_result", tool_use_id: "c1", content: [{ type: "text", text: JSON.stringify({ id: "s1" }) }] },
+            ],
+          },
+        }),
+        transcriptLine({
+          message: {
+            role: "assistant",
+            model: "claude-opus-4",
+            usage: { input_tokens: 200, output_tokens: 80, cache_read_input_tokens: 10, cache_creation_input_tokens: 5 },
+          },
+        }),
+      ]
+      vi.mocked(readFileSync).mockReturnValue(lines.join("\n"))
+
+      await handleStop({ cwd: "/tmp/proj", transcript_path: "/tmp/t.jsonl" }, logger)
+
+      expect(appendCostEntry).toHaveBeenCalledWith(
+        nexusConfig,
+        "s1",
+        expect.objectContaining({
+          costUsd: null,
+          costSource: "runtime",
+          totalTokens: 280,
+          totalMessages: 1,
+          models: ["claude-opus-4"],
+        }),
+        { name: "nexus-cost-control", version: "1.1.0" },
+        expect.any(Function),
+      )
+    })
+
+    it("skips entirely when Helicone has no data and the transcript has no assistant messages", async () => {
+      vi.mocked(getNexusConfig).mockReturnValue(nexusConfig)
+      vi.mocked(getHeliconeConfig).mockReturnValue(heliconeConfig)
+      vi.mocked(queryHeliconeSession).mockResolvedValue(null)
+
+      const lines = [
+        transcriptLine({
+          message: { content: [{ type: "tool_use", id: "c1", name: "nexus_session_create", input: {} }] },
+        }),
+        transcriptLine({
+          message: {
+            content: [
+              { type: "tool_result", tool_use_id: "c1", content: [{ type: "text", text: JSON.stringify({ id: "s1" }) }] },
+            ],
+          },
+        }),
+      ]
+      vi.mocked(readFileSync).mockReturnValue(lines.join("\n"))
+
+      await handleStop({ cwd: "/tmp/proj", transcript_path: "/tmp/t.jsonl" }, logger)
+
+      expect(appendCostEntry).not.toHaveBeenCalled()
     })
   })
 })

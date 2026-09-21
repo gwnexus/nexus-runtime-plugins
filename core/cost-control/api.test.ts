@@ -44,4 +44,34 @@ describe("cost-control core api", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => "server error" }))
     await expect(appendCostEntry(nexusConfig, "sess-1", cost, pluginMeta)).rejects.toThrow("Nexus API 500")
   })
+
+  it("defaults cost_source to helicone when the field is absent", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => "ok" })
+    vi.stubGlobal("fetch", fetchMock)
+
+    await appendCostEntry(nexusConfig, "sess-1", cost, pluginMeta)
+
+    const metadata = JSON.parse(JSON.parse(fetchMock.mock.calls[0][1].body).metadata)
+    expect(metadata.cost_source).toBe("helicone")
+  })
+
+  it("writes cost_usd: null and cost_source: runtime for runtime-sourced entries", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => "ok" })
+    vi.stubGlobal("fetch", fetchMock)
+
+    const runtimeCost: HeliconeSessionCost = {
+      ...cost,
+      totalRequests: 0,
+      costUsd: null,
+      costSource: "runtime",
+      totalMessages: 4,
+    }
+
+    await appendCostEntry(nexusConfig, "sess-1", runtimeCost, pluginMeta)
+
+    const metadata = JSON.parse(JSON.parse(fetchMock.mock.calls[0][1].body).metadata)
+    expect(metadata.cost_usd).toBeNull()
+    expect(metadata.cost_source).toBe("runtime")
+    expect(metadata.total_messages).toBe(4)
+  })
 })

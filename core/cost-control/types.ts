@@ -18,7 +18,17 @@ export interface NexusState {
 }
 
 /**
- * Cost data aggregated from Helicone for a given Nexus session.
+ * Cost/usage data for a given Nexus session, sourced either from Helicone
+ * (metered cost, `costSource: "helicone"`) or aggregated directly from the
+ * runtime's own transcript/message data when Helicone has no record of the
+ * session (`costSource: "runtime"` — e.g. Claude Max / subscription lanes
+ * that bypass the Helicone gateway). `costSource` is optional for backward
+ * compatibility with existing Helicone call sites; `appendCostEntry`
+ * defaults it to `"helicone"` when absent.
+ *
+ * `costUsd` is `null` for runtime-sourced entries — a real dollar amount is
+ * not available, and reporting `0` would be indistinguishable from "ran and
+ * cost nothing".
  */
 export interface HeliconeSessionCost {
   nexusSessionId: string
@@ -28,8 +38,10 @@ export interface HeliconeSessionCost {
   tokensCacheRead: number
   tokensCacheWrite: number
   totalTokens: number
-  costUsd: number
+  costUsd: number | null
+  costSource?: "helicone" | "runtime"
   models: string[]
+  totalMessages?: number
   queriedAt: string
 }
 

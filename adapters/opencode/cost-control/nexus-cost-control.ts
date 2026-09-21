@@ -5,6 +5,7 @@ import { tryParseJson, extractNexusState } from "../../../core/cost-control/stat
 import { queryHeliconeSession } from "../../../core/cost-control/helicone.ts"
 import { formatCostSummary } from "../../../core/cost-control/format.ts"
 import { appendCostEntry } from "../../../core/cost-control/api.ts"
+import { emptyRuntimeUsage, buildRuntimeCostEntry, type RuntimeUsage } from "../../../core/cost-control/runtime-usage.ts"
 import type { NormalizedToolCall } from "../../../core/cost-control/types.ts"
 
 /**
@@ -19,7 +20,7 @@ import type { NormalizedToolCall } from "../../../core/cost-control/types.ts"
  */
 const PLUGIN_META = {
   name: "nexus-cost-control",
-  version: "1.0.1",
+  version: "1.1.0",
   description:
     "Token usage and cost tracking for Nexus sessions via Helicone. " +
     "Wraps Helicone's LLM observability API to surface per-session token " +
@@ -33,6 +34,44 @@ interface ToolPartShape {
   toolName?: string
   args?: Record<string, unknown>
   result?: unknown
+}
+
+interface AssistantMessageInfo {
+  role: string
+  modelID?: string
+  tokens?: { input?: number; output?: number; cache?: { read?: number; write?: number } }
+}
+
+/**
+ * Aggregate token usage directly from OpenCode's native message data
+ * (`info.tokens`), used as a fallback cost-control source when Helicone has
+ * no data for a session (Dispatch 515186c1). No cost figure is derivable
+ * here — only Helicone knows the metered dollar cost.
+ */
+export function aggregateOpenCodeUsage(
+  messages: Array<{ info: { role: string }; parts: Array<Record<string, unknown>> }>,
+): RuntimeUsage {
+  const usage = emptyRuntimeUsage()
+  const modelsSet = new Set<string>()
+
+  for (const msg of messages) {
+    const info = msg.info as unknown as AssistantMessageInfo
+    if (info.role !== "assistant") continue
+
+    usage.totalMessages += 1
+    const tokens = info.tokens
+    if (tokens) {
+      usage.tokensInput += tokens.input ?? 0
+      usage.tokensOutput += tokens.output ?? 0
+      usage.tokensCacheRead += tokens.cache?.read ?? 0
+      usage.tokensCacheWrite += tokens.cache?.write ?? 0
+    }
+    if (info.modelID) modelsSet.add(info.modelID)
+  }
+
+  usage.totalTokens = usage.tokensInput + usage.tokensOutput
+  usage.models = Array.from(modelsSet)
+  return usage
 }
 
 /** Convert OpenCode session messages into the shared NormalizedToolCall[] shape. */
@@ -112,15 +151,18 @@ export const NexusCostControl: Plugin = async (ctx) => {
           }
 
           let nexusSessionId: string | undefined
+          let sessionMessages: Array<{ info: { role: string }; parts: Array<Record<string, unknown>> }> = []
           try {
             const sessions = await client.session.list({})
             const activeSessions = sessions.data ?? []
             if (activeSessions.length > 0) {
               const latestSession = activeSessions[0]
               const msgs = await client.session.messages({ path: { id: (latestSession as { id: string }).id } })
-              const calls = normalizeOpenCodeMessages(
-                (msgs.data ?? []) as Array<{ info: { role: string }; parts: Array<Record<string, unknown>> }>,
-              )
+              sessionMessages = (msgs.data ?? []) as Array<{
+                info: { role: string }
+                parts: Array<Record<string, unknown>>
+              }>
+              const calls = normalizeOpenCodeMessages(sessionMessages)
               const state = extractNexusState(calls, (m) => fileLog("debug", m))
               nexusSessionId = state.sessionId
             }
@@ -134,7 +176,11 @@ export const NexusCostControl: Plugin = async (ctx) => {
 
           const cost = await queryHeliconeSession(heliconeConfig, nexusSessionId, (level, msg) => fileLog(level, msg))
           if (!cost) {
-            return `No Helicone data found for session \`${nexusSessionId}\`. Make sure requests are routed through the Helicone proxy and that the Helicone-Session-Id header is set to the Nexus session ID.`
+            const usage = aggregateOpenCodeUsage(sessionMessages)
+            if (usage.totalMessages === 0) {
+              return `No Helicone data found for session \`${nexusSessionId}\`. Make sure requests are routed through the Helicone proxy and that the Helicone-Session-Id header is set to the Nexus session ID.`
+            }
+            return formatCostSummary(buildRuntimeCostEntry(nexusSessionId, usage), PLUGIN_META.version)
           }
 
           return formatCostSummary(cost, PLUGIN_META.version)
@@ -202,27 +248,37 @@ export const NexusCostControl: Plugin = async (ctx) => {
         }
 
         const cost = await queryHeliconeSession(heliconeConfig, state.sessionId, (level, msg) => fileLog(level, msg))
-        if (!cost) {
-          fileLog("info", `No Helicone data for session ${state.sessionId} — skipping`)
+        let entry = cost
+        if (!entry) {
+          const usage = aggregateOpenCodeUsage(messages)
+          if (usage.totalMessages === 0) {
+            fileLog("info", `No Helicone data for session ${state.sessionId} — skipping`)
+            return
+          }
+          entry = buildRuntimeCostEntry(state.sessionId, usage)
+          fileLog(
+            "info",
+            `No Helicone data for session ${state.sessionId} — falling back to runtime token aggregation (cost_source=runtime)`,
+          )
+        }
+
+        if (lastAppendedTokens !== null && entry.totalTokens === lastAppendedTokens) {
+          fileLog("debug", `session.idle — skipping (no token delta, still ${entry.totalTokens})`)
           return
         }
 
-        if (lastAppendedTokens !== null && cost.totalTokens === lastAppendedTokens) {
-          fileLog("debug", `session.idle — skipping (no token delta, still ${cost.totalTokens})`)
-          return
-        }
-
-        await appendCostEntry(nexusConfig, state.sessionId, cost, PLUGIN_META, (level, msg) => fileLog(level, msg))
+        await appendCostEntry(nexusConfig, state.sessionId, entry, PLUGIN_META, (level, msg) => fileLog(level, msg))
 
         lastAppendAt = Date.now()
-        lastAppendedTokens = cost.totalTokens
+        lastAppendedTokens = entry.totalTokens
 
-        fileLog("info", `Cost entry recorded — $${cost.costUsd.toFixed(6)} / ${cost.totalTokens} tokens`)
+        const costLabel = entry.costUsd === null ? "n/a (runtime)" : `$${entry.costUsd.toFixed(6)}`
+        fileLog("info", `Cost entry recorded — ${costLabel} / ${entry.totalTokens} tokens`)
         await client.app.log({
           body: {
             service: PLUGIN_META.name,
             level: "info",
-            message: `Cost snapshot recorded in Nexus session ${state.sessionId}: $${cost.costUsd.toFixed(6)} / ${cost.totalTokens} tokens`,
+            message: `Cost snapshot recorded in Nexus session ${state.sessionId}: ${costLabel} / ${entry.totalTokens} tokens`,
           },
         })
       } catch (err) {
