@@ -91,7 +91,7 @@ describe("cost-control Claude Code adapter", () => {
   })
 
   describe("handleStop", () => {
-    it("skips when Nexus or Helicone config is missing", async () => {
+    it("skips when Nexus config is missing (Helicone is optional, not gating)", async () => {
       await handleStop({ cwd: "/tmp/proj" }, logger)
       expect(queryHeliconeSession).not.toHaveBeenCalled()
     })
@@ -109,6 +109,42 @@ describe("cost-control Claude Code adapter", () => {
       vi.mocked(readFileSync).mockReturnValue("")
       await handleStop({ cwd: "/tmp/proj", transcript_path: "/tmp/t.jsonl" }, logger)
       expect(queryHeliconeSession).not.toHaveBeenCalled()
+    })
+
+    it("records a native token-only entry with no Helicone config at all (zero-config path)", async () => {
+      vi.mocked(getNexusConfig).mockReturnValue(nexusConfig)
+      vi.mocked(getHeliconeConfig).mockReturnValue(null)
+      const lines = [
+        transcriptLine({
+          message: { content: [{ type: "tool_use", id: "c1", name: "nexus_session_create", input: {} }] },
+        }),
+        transcriptLine({
+          message: {
+            content: [
+              { type: "tool_result", tool_use_id: "c1", content: [{ type: "text", text: JSON.stringify({ id: "s1" }) }] },
+            ],
+          },
+        }),
+        transcriptLine({
+          message: {
+            role: "assistant",
+            model: "claude-opus-4",
+            usage: { input_tokens: 300, output_tokens: 90 },
+          },
+        }),
+      ]
+      vi.mocked(readFileSync).mockReturnValue(lines.join("\n"))
+
+      await handleStop({ cwd: "/tmp/proj", transcript_path: "/tmp/t.jsonl" }, logger)
+
+      expect(queryHeliconeSession).not.toHaveBeenCalled()
+      expect(appendCostEntry).toHaveBeenCalledWith(
+        nexusConfig,
+        "s1",
+        expect.objectContaining({ costUsd: null, costSource: "runtime", totalTokens: 390 }),
+        { name: "nexus-cost-control", version: "1.2.0" },
+        expect.any(Function),
+      )
     })
 
     it("records a cost entry when Helicone data is found", async () => {
@@ -146,7 +182,7 @@ describe("cost-control Claude Code adapter", () => {
         nexusConfig,
         "s1",
         expect.objectContaining({ totalTokens: 150 }),
-        { name: "nexus-cost-control", version: "1.1.0" },
+        { name: "nexus-cost-control", version: "1.2.0" },
         expect.any(Function),
       )
     })
@@ -227,7 +263,7 @@ describe("cost-control Claude Code adapter", () => {
           totalMessages: 1,
           models: ["claude-opus-4"],
         }),
-        { name: "nexus-cost-control", version: "1.1.0" },
+        { name: "nexus-cost-control", version: "1.2.0" },
         expect.any(Function),
       )
     })

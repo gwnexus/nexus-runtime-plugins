@@ -22,6 +22,13 @@
  * formatting, and the Nexus API call are shared verbatim with the OpenCode
  * adapter via core/cost-control/*.
  *
+ * Precedence (per ADR-0040, nexus-app; corrected 2026-09-23, Dispatch
+ * `6298a740`): native transcript-usage aggregation (`aggregateClaudeUsage`)
+ * is the default, zero-configuration source and always runs when Helicone
+ * has no data. Helicone is optional, opt-in enrichment -- if
+ * `HELICONE_API_KEY` is configured, it is queried first and its result
+ * (with a real metered `cost_usd`) is preferred when it returns data.
+ *
  * Session/token-delta state is persisted to
  * `.nexus/cost-control-state.json` between invocations (Claude Code spawns
  * a fresh process per hook event, unlike OpenCode's long-lived plugin
@@ -52,7 +59,7 @@ import { appendCostEntry } from "../../../core/cost-control/api.ts"
 import { emptyRuntimeUsage, buildRuntimeCostEntry, type RuntimeUsage } from "../../../core/cost-control/runtime-usage.ts"
 import type { NormalizedToolCall } from "../../../core/cost-control/types.ts"
 
-const PLUGIN_META = { name: "nexus-cost-control", version: "1.1.0" } as const
+const PLUGIN_META = { name: "nexus-cost-control", version: "1.2.0" } as const
 const STATE_FILE = "cost-control-state.json"
 
 interface CostControlState {
@@ -191,8 +198,8 @@ export async function handleStop(
   const nexusConfig = getNexusConfig(directory)
   const heliconeConfig = getHeliconeConfig(directory)
 
-  if (!nexusConfig || !heliconeConfig) {
-    logger("debug", "Stop — skipping (Nexus or Helicone config not present)")
+  if (!nexusConfig) {
+    logger("debug", "Stop — skipping (Nexus config not present)")
     return
   }
 
@@ -216,18 +223,20 @@ export async function handleStop(
     return
   }
 
-  const cost = await queryHeliconeSession(heliconeConfig, nexusState.sessionId, (level, msg) => logger(level, msg))
+  const cost = heliconeConfig
+    ? await queryHeliconeSession(heliconeConfig, nexusState.sessionId, (level, msg) => logger(level, msg))
+    : null
   let entry = cost
   if (!entry) {
     const usage = aggregateClaudeUsage(input.transcript_path)
     if (usage.totalMessages === 0) {
-      logger("info", `No Helicone data for session ${nexusState.sessionId} — skipping`)
+      logger("info", `No usage data for session ${nexusState.sessionId} — skipping`)
       return
     }
     entry = buildRuntimeCostEntry(nexusState.sessionId, usage)
     logger(
       "info",
-      `No Helicone data for session ${nexusState.sessionId} — falling back to runtime token aggregation (cost_source=runtime)`,
+      `Recording native token aggregation for session ${nexusState.sessionId} (cost_source=runtime${heliconeConfig ? ", Helicone configured but returned no data" : ""})`,
     )
   }
 

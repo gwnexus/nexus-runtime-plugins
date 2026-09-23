@@ -77,10 +77,9 @@ describe("NexusCostControl", () => {
   })
 
   describe("nexus_cost_summary tool", () => {
-    it("should report missing Helicone config when not set", async () => {
+    it("reports no active session when none is found (no Helicone config needed)", async () => {
       const result = await hooks.tool.nexus_cost_summary.execute()
-      expect(result).toContain("not configured")
-      expect(result).toContain("HELICONE_API_KEY")
+      expect(result).toContain("No active Nexus session found")
     })
   })
 
@@ -190,7 +189,7 @@ describe("NexusCostControl", () => {
   })
 
   describe("state extraction", () => {
-    it("should extract session from nexus_session_create result", async () => {
+    it("should extract session from nexus_session_create result and run native aggregation with no Helicone config", async () => {
       // This tests the extractNexusState function indirectly via session.compacting
       // NexusCostControl uses the same extractNexusState as compaction-plus
       // We verify via the nexus_cost_summary tool which fetches messages
@@ -216,10 +215,54 @@ describe("NexusCostControl", () => {
         ],
       })
 
-      // nexus_cost_summary calls extractNexusState internally
-      // Without Helicone config, it returns early — but we can verify the flow
+      // No Helicone config: the tool now runs native aggregation unconditionally
+      // instead of returning "not configured".
       const result = await hooks.tool.nexus_cost_summary.execute()
-      expect(result).toContain("not configured")
+      expect(result).toContain("Token & Cost Summary")
+      expect(result).toContain("n/a (subscription — not metered)")
+    })
+
+    it("prefers Helicone data as enrichment when it is configured and returns data", async () => {
+      const heliconeConfig = { apiKey: "sk-helicone" }
+      vi.mocked(getHeliconeConfig).mockReturnValue(heliconeConfig)
+      vi.mocked(queryHeliconeSession).mockResolvedValue({
+        nexusSessionId: "nexus-sess-1",
+        totalRequests: 3,
+        tokensInput: 500,
+        tokensOutput: 200,
+        tokensCacheRead: 0,
+        tokensCacheWrite: 0,
+        totalTokens: 700,
+        costUsd: 0.0042,
+        costSource: "helicone",
+        models: ["claude-sonnet-5"],
+        queriedAt: new Date().toISOString(),
+      })
+      hooks = await NexusCostControl({ client, directory: "/tmp/test-project" } as any)
+
+      client.session.list.mockResolvedValue({ data: [{ id: "oc-session-1" }] })
+      client.session.messages.mockResolvedValue({
+        data: [
+          {
+            info: { role: "assistant" },
+            parts: [
+              {
+                type: "tool",
+                tool: "nexus_session_create",
+                state: { status: "completed", input: {}, output: JSON.stringify({ id: "nexus-sess-1" }) },
+              },
+            ],
+          },
+        ],
+      })
+
+      const result = await hooks.tool.nexus_cost_summary.execute()
+      expect(result).toContain("$0.004200")
+      expect(queryHeliconeSession).toHaveBeenCalledWith(
+        heliconeConfig,
+        "nexus-sess-1",
+        expect.any(Function),
+      )
     })
   })
 })

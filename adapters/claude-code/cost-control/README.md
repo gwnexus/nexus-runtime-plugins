@@ -38,25 +38,33 @@ formatting, and the Nexus API call live in
    independently in this pass; consider consolidating into a shared
    `core/claude-transcript.ts` helper in a follow-up if a third plugin needs
    it.
-5. **Runtime fallback for Claude Max / subscription sessions
-   (`cost_source: "runtime"`).** Claude Max sessions talk directly to
-   Anthropic and never pass through the Helicone gateway, so
-   `queryHeliconeSession` returns `null` for those sessions even though
-   Helicone is configured. Rather than writing nothing, this adapter
-   aggregates token counts directly from the transcript's assistant
-   `message.usage` blocks (`input_tokens`, `output_tokens`,
+5. **Native aggregation is the default, zero-config path; Helicone is
+   optional enrichment (`cost_source: "runtime" | "helicone"`).** Per
+   ADR-0040 (nexus-app), `queryHeliconeSession` is only consulted when
+   `HELICONE_API_KEY` is configured, and is not a gating requirement for
+   `handleStop` to run. When Helicone is absent, not configured, or
+   configured but returns no data (e.g. Claude Max sessions, which talk
+   directly to Anthropic and never pass through the Helicone gateway),
+   this adapter aggregates token counts directly from the transcript's
+   assistant `message.usage` blocks (`input_tokens`, `output_tokens`,
    `cache_read_input_tokens`, `cache_creation_input_tokens`) and appends a
    token-only entry with `cost_usd: null` (never `0`, which would be
    indistinguishable from "ran and cost nothing") and `cost_source:
-   "runtime"`. If no assistant messages are found in the transcript either,
-   no entry is written. See Dispatch `515186c1`.
+   "runtime"`. If Helicone is configured and returns data, that metered
+   entry (`cost_source: "helicone"`, real `cost_usd`) is preferred. If no
+   assistant messages are found in the transcript either, no entry is
+   written. `v1.1.0` briefly inverted this precedence (gated everything on
+   `HELICONE_API_KEY` being configured) -- a drift from ADR-0040 introduced
+   during the ADR-C05 restructure, corrected in `v1.2.0`. See Dispatch
+   `515186c1` and `6298a740`.
 
-## Not covered by this fallback
+## Native aggregation vs. Helicone enrichment
 
 Pointing `ANTHROPIC_BASE_URL` at Helicone would give the Claude Max lane
-real token-level *and* cost-level observability (Helicone would see the
-requests directly). That is a policy/credential-routing decision, not a
-plugin change, and is intentionally out of scope here.
+real token-level *and* cost-level observability from Helicone directly
+(rather than the transcript-derived token counts this adapter uses). That
+is a policy/credential-routing decision, not a plugin change, and is
+intentionally out of scope here.
 
 ## VERIFY BEFORE PRODUCTION USE
 
@@ -88,12 +96,16 @@ Add to `.claude/settings.json`:
 
 ## Configuration
 
-Same environment variables as the OpenCode adapter:
+`NEXUS_API_URL` and `NEXUS_PRIVATE_TOKEN` are required; `HELICONE_API_KEY`
+is optional and enables Helicone enrichment on top of the always-on native
+aggregation:
 
 ```bash
-export HELICONE_API_KEY="sk-helicone-..."
 export NEXUS_API_URL="https://nexus.gatewarden.eu"
 export NEXUS_PRIVATE_TOKEN="nxs_pat_..."
+
+# Optional: enables Helicone enrichment (metered cost_usd)
+export HELICONE_API_KEY="sk-helicone-..."
 ```
 
 ## Logs
@@ -107,10 +119,11 @@ Persisted debounce/dedup state: `.nexus/cost-control-state.json`.
 npm test -- adapters/claude-code/cost-control
 ```
 
-7 unit tests covering transcript JSONL parsing, config-missing fail-open
-behavior, missing-session-ID skip, cost-entry recording, debounce/dedup
-across separate invocations, and the runtime-fallback token-only entry path
-for sessions with no Helicone data.
+10 unit tests covering transcript JSONL parsing, missing-Nexus-config
+fail-open behavior, missing-session-ID skip, cost-entry recording,
+debounce/dedup across separate invocations, and the zero-config native
+token-only entry path for sessions with no Helicone data or no Helicone
+key configured at all.
 
 ## License
 

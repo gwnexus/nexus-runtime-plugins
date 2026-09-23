@@ -17,14 +17,23 @@ import type { NormalizedToolCall } from "../../../core/cost-control/types.ts"
  * hook and the `nexus_cost_summary` / `nexus_show_plugins` tools. Parsing
  * OpenCode's message/part shape into the shared `NormalizedToolCall[]`
  * format is the only OpenCode-specific concern left in this file.
+ *
+ * Precedence (per ADR-0040, nexus-app; corrected 2026-09-23, Dispatch
+ * `6298a740` after drift was found during the ADR-C05 restructure): native
+ * OpenCode message-data aggregation (`aggregateOpenCodeUsage`) is the
+ * default, zero-configuration cost/usage source and always runs. Helicone
+ * is optional, opt-in enrichment — if `HELICONE_API_KEY` is configured, it
+ * is queried in addition and its result (with a real metered `cost_usd`) is
+ * preferred over the native token-only entry when it returns data.
  */
 const PLUGIN_META = {
   name: "nexus-cost-control",
-  version: "1.1.0",
+  version: "1.2.0",
   description:
-    "Token usage and cost tracking for Nexus sessions via Helicone. " +
-    "Wraps Helicone's LLM observability API to surface per-session token " +
-    "counts and estimated cost directly in the Nexus session timeline.",
+    "Token usage and cost tracking for Nexus sessions. Aggregates token " +
+    "counts directly from the runtime's own message data with zero " +
+    "configuration required; optionally enriches with metered dollar cost " +
+    "from Helicone if HELICONE_API_KEY is configured.",
 } as const
 
 interface ToolPartShape {
@@ -140,16 +149,13 @@ export const NexusCostControl: Plugin = async (ctx) => {
     tool: {
       nexus_cost_summary: tool({
         description:
-          "Show token usage and estimated cost for the current Nexus session, " +
-          "queried live from Helicone. Returns input/output/cache token counts " +
-          "and estimated cost in USD. Use this to give the user a cost overview " +
-          "or before closing a session.",
+          "Show token usage and estimated cost for the current Nexus session. " +
+          "Returns input/output/cache token counts, aggregated natively from " +
+          "the runtime with zero configuration required, enriched with metered " +
+          "USD cost if HELICONE_API_KEY is configured. Use this to give the " +
+          "user a cost overview or before closing a session.",
         args: {},
         async execute() {
-          if (!heliconeConfig) {
-            return "Cost tracking is not configured. Set HELICONE_API_KEY to enable Helicone integration."
-          }
-
           let nexusSessionId: string | undefined
           let sessionMessages: Array<{ info: { role: string }; parts: Array<Record<string, unknown>> }> = []
           try {
@@ -174,13 +180,17 @@ export const NexusCostControl: Plugin = async (ctx) => {
             return "No active Nexus session found. Start a session with nexus_session_create first."
           }
 
-          const cost = await queryHeliconeSession(heliconeConfig, nexusSessionId, (level, msg) => fileLog(level, msg))
+          const usage = aggregateOpenCodeUsage(sessionMessages)
+
+          let cost = heliconeConfig
+            ? await queryHeliconeSession(heliconeConfig, nexusSessionId, (level, msg) => fileLog(level, msg))
+            : null
+
           if (!cost) {
-            const usage = aggregateOpenCodeUsage(sessionMessages)
             if (usage.totalMessages === 0) {
-              return `No Helicone data found for session \`${nexusSessionId}\`. Make sure requests are routed through the Helicone proxy and that the Helicone-Session-Id header is set to the Nexus session ID.`
+              return `No usage data found for session \`${nexusSessionId}\` yet.`
             }
-            return formatCostSummary(buildRuntimeCostEntry(nexusSessionId, usage), PLUGIN_META.version)
+            cost = buildRuntimeCostEntry(nexusSessionId, usage)
           }
 
           return formatCostSummary(cost, PLUGIN_META.version)
@@ -204,10 +214,10 @@ export const NexusCostControl: Plugin = async (ctx) => {
             `**Description:** ${PLUGIN_META.description}`,
             ``,
             `### Hooks registered`,
-            `- \`event (session.idle)\` — queries Helicone and records cost entry in active Nexus session (debounced: 5 min)`,
+            `- \`event (session.idle)\` — aggregates native token usage and records cost entry in active Nexus session (debounced: 5 min); enriches with Helicone cost if configured`,
             ``,
             `### Tools registered`,
-            `- \`nexus_cost_summary\` — on-demand live cost snapshot from Helicone`,
+            `- \`nexus_cost_summary\` — on-demand live usage snapshot (native, Helicone-enriched if configured)`,
             `- \`nexus_show_plugins\` — this overview`,
           ].join("\n")
         },
@@ -218,7 +228,7 @@ export const NexusCostControl: Plugin = async (ctx) => {
       const eventType = event.type as string
 
       if (eventType !== "session.idle") return
-      if (!heliconeConfig || !nexusConfig) return
+      if (!nexusConfig) return
 
       if (lastAppendAt && Date.now() - lastAppendAt < IDLE_DEBOUNCE_MS) {
         fileLog("debug", `session.idle — skipping (last append ${Date.now() - lastAppendAt}ms ago)`)
@@ -247,18 +257,20 @@ export const NexusCostControl: Plugin = async (ctx) => {
           return
         }
 
-        const cost = await queryHeliconeSession(heliconeConfig, state.sessionId, (level, msg) => fileLog(level, msg))
+        const cost = heliconeConfig
+          ? await queryHeliconeSession(heliconeConfig, state.sessionId, (level, msg) => fileLog(level, msg))
+          : null
         let entry = cost
         if (!entry) {
           const usage = aggregateOpenCodeUsage(messages)
           if (usage.totalMessages === 0) {
-            fileLog("info", `No Helicone data for session ${state.sessionId} — skipping`)
+            fileLog("info", `No usage data for session ${state.sessionId} — skipping`)
             return
           }
           entry = buildRuntimeCostEntry(state.sessionId, usage)
           fileLog(
             "info",
-            `No Helicone data for session ${state.sessionId} — falling back to runtime token aggregation (cost_source=runtime)`,
+            `Recording native token aggregation for session ${state.sessionId} (cost_source=runtime${heliconeConfig ? ", Helicone configured but returned no data" : ""})`,
           )
         }
 

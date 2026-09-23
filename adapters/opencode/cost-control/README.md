@@ -3,15 +3,20 @@
 An [OpenCode](https://opencode.ai) plugin that surfaces token usage and cost
 visibility inside [Nexus](https://nexus.gatewarden.eu) sessions.
 
-**Current version:** `v1.1.0`  
-**Tracking mechanism:** [Helicone](https://helicone.ai) LLM observability proxy  
-**Requires:** `HELICONE_API_KEY`, `NEXUS_API_URL`, `NEXUS_PRIVATE_TOKEN`
+**Current version:** `v1.2.0`  
+**Tracking mechanism:** native OpenCode message-data aggregation (zero-config, primary), with optional [Helicone](https://helicone.ai) enrichment  
+**Requires:** `NEXUS_API_URL`, `NEXUS_PRIVATE_TOKEN` (`HELICONE_API_KEY` is optional)
 
-> **Roadmap — v2.0.0:** A rewrite is planned that reads cost data directly from
-> OpenCode native message data as the primary source, removing the Helicone
-> dependency entirely. As of v1.1.0, native OpenCode message data (token
-> counts only, no cost) is already used as a fallback when Helicone has no
-> record of a session — see "Runtime fallback" below.
+> **Precedence (per ADR-0040, nexus-app):** native token-usage aggregation
+> from OpenCode's own message data is the default, always-on,
+> zero-configuration path. Helicone is opt-in enrichment: if
+> `HELICONE_API_KEY` is configured, it is queried in addition and its
+> result (with a real metered `cost_usd`) is preferred when it returns
+> data. Earlier `v1.1.0` inverted this (gated everything on Helicone being
+> configured, with native aggregation only as a fallback for empty
+> Helicone responses) -- a drift from ADR-0040 introduced during the
+> ADR-C05 core/adapters restructure, corrected in `v1.2.0` per Dispatch
+> `6298a740`.
 
 > Migrated to the ADR-C05 `core/` + `adapters/` structure (Track B2, the
 > last plugin in this restructure pass). Credential resolution, state
@@ -23,26 +28,27 @@ visibility inside [Nexus](https://nexus.gatewarden.eu) sessions.
 
 ## What this plugin does
 
-The plugin connects [Helicone](https://helicone.ai) — an LLM observability
-proxy that records every provider request — to the Nexus session timeline.
-
-1. **Session grouping**: injects the active Nexus session ID as a
-   `Helicone-Session-Id` property so every LLM call in a Nexus session is
-   grouped and queryable together in the Helicone dashboard.
-2. **Automatic cost recording**: on `session.idle` (agent finishes a work
-   burst), queries the Helicone API for cumulative token and cost data and
+1. **Session grouping (optional, Helicone only)**: if configured, injects
+   the active Nexus session ID as a `Helicone-Session-Id` property so every
+   LLM call in a Nexus session is grouped and queryable together in the
+   Helicone dashboard.
+2. **Automatic usage recording**: on `session.idle` (agent finishes a work
+   burst), aggregates token counts directly from OpenCode's own message
+   data (`AssistantMessage.tokens`) -- no external service required -- and
    appends a structured summary to the Nexus session timeline.
-3. **On-demand cost tool**: exposes `nexus_cost_summary` so the agent can pull
-   a live cost snapshot at any time during a session.
-4. **Runtime fallback (`cost_source: "runtime"`)**: if Helicone is
-   configured but has no data for the session (subscription/direct-provider
-   lanes that never pass through the Helicone proxy), the plugin falls back
-   to aggregating token counts directly from OpenCode's own message data
-   (`AssistantMessage.tokens`). The recorded entry has `cost_usd: null`
-   (never `0`) and `cost_source: "runtime"`, so downstream consumers can
-   tell a metered entry from a token-only one. See Dispatch `515186c1`.
+3. **Helicone enrichment (optional)**: if `HELICONE_API_KEY` is configured,
+   the plugin also queries Helicone for the session; if Helicone has data,
+   its result (with a real metered `cost_usd`, latency, etc.) is recorded
+   instead of the native token-only entry.
+4. **On-demand cost tool**: exposes `nexus_cost_summary` so the agent can pull
+   a live usage/cost snapshot at any time during a session.
+5. **`cost_source` field**: every recorded entry carries `cost_source:
+   "runtime"` (native aggregation, `cost_usd: null`) or `cost_source:
+   "helicone"` (metered, `cost_usd` is a real dollar figure), so downstream
+   consumers can tell the two apart without inferring it from a missing
+   field. See Dispatch `515186c1` and `6298a740`.
 
-## How Helicone works
+## How Helicone enrichment works (optional)
 
 Helicone sits as a transparent proxy between your agent and the LLM provider
 (Anthropic, OpenAI, etc.). Every LLM call is recorded with:
@@ -51,6 +57,10 @@ Helicone sits as a transparent proxy between your agent and the LLM provider
 - Estimated cost in USD (using published model pricing)
 - Latency and model name
 - Custom session/property headers for grouping
+
+This is entirely optional. Without it, the plugin still records token usage
+via native OpenCode message data -- `cost_usd` will be `null` in that case
+since no external service has computed a metered dollar figure.
 
 Route requests through Helicone by changing the provider base URL:
 
@@ -78,12 +88,14 @@ Ensure `.opencode/package.json` includes the plugin SDK:
 
 ## Configuration
 
-### 1. Set environment variables
+### 1. Set environment variables (Helicone key is optional)
 
 ```bash
-export HELICONE_API_KEY="sk-helicone-..."
 export NEXUS_API_URL="https://nexus.gatewarden.eu"
 export NEXUS_PRIVATE_TOKEN="nxs_pat_..."
+
+# Optional: enables Helicone enrichment (metered cost_usd, latency, dashboard)
+export HELICONE_API_KEY="sk-helicone-..."
 ```
 
 `HELICONE_API_KEY` can also be stored in `~/.config/nexus/config.toml`:
@@ -92,7 +104,7 @@ export NEXUS_PRIVATE_TOKEN="nxs_pat_..."
 helicone_api_key = "sk-helicone-..."
 ```
 
-### 2. Route requests through Helicone
+### 2. Route requests through Helicone (optional, only if you want enrichment)
 
 In your `opencode.json`, change the provider base URL and add the session
 header. Example for Anthropic:
@@ -136,44 +148,50 @@ header. Example for Anthropic:
 
 ## How it works
 
-### `session.idle` → cost recording
+### `session.idle` → usage/cost recording
 
 When the agent finishes a work burst and goes idle, the plugin:
 
 1. Fetches the active OpenCode session messages
 2. Extracts the Nexus session ID from tool call history
-3. Queries Helicone for all requests tagged with that session ID
-4. Aggregates token counts and cost across all matched requests
+3. Aggregates token counts from OpenCode's native message data
+   (`AssistantMessage.tokens`) -- always, with no external dependency
+4. If `HELICONE_API_KEY` is configured, also queries Helicone; if it
+   returns data, that metered entry (`cost_source: "helicone"`) is recorded
+   instead of the native one
 5. Appends a structured markdown table to the Nexus session via the MCP API
 
 Recording is debounced — at most once every 5 minutes — to avoid spamming the
 timeline during rapid back-and-forth sessions.
 
-If Helicone returns no data for the session, the plugin aggregates token
-counts from OpenCode's native message data instead (`cost_source: "runtime"`,
-`cost_usd: null`) rather than skipping the entry outright. If no assistant
-messages are found either, no entry is written.
+If no assistant messages exist and Helicone has no data either, no entry is
+written (nothing to report).
 
 ### `nexus_cost_summary` tool
 
-The agent can call this at any time to get a live cost snapshot:
+The agent can call this at any time to get a live usage/cost snapshot, with
+no configuration required:
 
 ```
 ## Token & Cost Summary — 14:32
 
-Tracked via Helicone · nexus-cost-control v1.1.0
+Tracked via runtime token counts (no Helicone data for this session — subscription/direct-provider lane) · nexus-cost-control v1.2.0
 
 | Metric              | Value        |
 |---------------------|--------------|
-| Requests            | 47           |
+| Assistant messages  | 47           |
 | Input tokens        | 124,500      |
 | Output tokens       | 32,100       |
 | Cache read tokens   | 80,000       |
 | Cache write tokens  | 44,500       |
 | Total tokens        | 156,600      |
-| Estimated cost      | $0.084200    |
+| Estimated cost      | n/a (subscription — not metered) |
 | Models              | claude-opus-4|
 ```
+
+If Helicone is configured and returns data for the session, the summary
+instead shows `Tracked via [Helicone](https://helicone.ai)`, a `Requests`
+row, and a real `$` cost figure.
 
 ## Testing
 
@@ -181,10 +199,11 @@ Tracked via Helicone · nexus-cost-control v1.1.0
 npm test -- adapters/opencode/cost-control core/cost-control
 ```
 
-8 unit tests for this adapter (hook registration, tool output, event
-routing, config handling, runtime-fallback recording), plus 19 unit tests
-for the shared core modules (state extraction, config resolution, Helicone
-client, formatting, runtime-usage aggregation, API call).
+9 unit tests for this adapter (hook registration, tool output, event
+routing, zero-config native recording, Helicone-enrichment precedence),
+plus 19 unit tests for the shared core modules (state extraction, config
+resolution, Helicone client, formatting, runtime-usage aggregation, API
+call).
 
 ## License
 
