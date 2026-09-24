@@ -38,8 +38,11 @@ file only documents the Claude Code-specific wiring.
    OpenCode-specific SDK-version gating does not apply and is omitted.
 
 3. **No `session.idle` equivalent.** Metrics are persisted to
-   `.nexus/headroom-metrics-state.json` between invocations and flushed as a
-   `session_summary` log line on the `Stop` hook, then reset.
+   `.nexus/headroom-metrics-state.json` between invocations, accumulated for
+   the whole session (reset only when the hook's `session_id` changes), and
+   flushed as a cumulative `session_summary` log line on every `Stop` hook.
+   The summary carries `session_id`, `mode` (effective gate mode),
+   `requestedMode`, and `downgradeReason`, read from the cached gate state.
 
 ## Confirmed hook output field (2026-09-20)
 
@@ -54,6 +57,18 @@ table only ever compresses `nexus_`/`headroom_`-prefixed MCP tool output
 built-in tool, so a plain-string `updatedToolOutput` is always safe here. If
 the policy table is ever extended to compress a built-in tool's output, that
 entry must preserve the tool's native output shape instead.
+
+## Confirmed MCP `tool_response` shape (2026-09-24, Dispatch 1bc7ff92)
+
+Captured live from a real Claude Code session (structure only, no content):
+for MCP tools, `PostToolUse` delivers `tool_response` as a **bare array of
+content blocks** (`[{ type: "text", text }]`), not `{ content: [...] }`.
+The adapter accepts that array, `{ content: [...] }`, `{ content: string }`,
+`structuredContent` (as JSON text, when no text blocks exist), and a plain
+string. `updatedToolOutput` mirrors the source shape. Responses containing
+any non-text block (or `isError: true`) are passed through unchanged. On
+`unsupported_shape`, the log line includes structure-only diagnostics
+(`responseType`, `responseLength`/`topLevelKeys`, `firstBlockKeys`).
 
 ## Installation
 
@@ -118,8 +133,8 @@ Shared JSONL log file with the OpenCode adapter:
 npm test -- adapters/claude-code/headroom-intercept
 ```
 
-11 unit tests covering `tool_response` shape normalization (string vs. MCP
-`content[]`), policy routing, observe vs. transform mode output, cross-process
+Unit tests cover `tool_response` shape normalization (including the live
+bare-array fixture), shape diagnostics, policy routing, observe vs. transform mode output, cross-process
 metrics persistence, and the `Stop` hook's session summary flush.
 
 ## License

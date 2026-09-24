@@ -966,13 +966,13 @@ function intercept(input, metrics, store, logger) {
     logger.debug("policy_passthrough", { tool: toolName, reason: policy.reason });
     return { action: "passthrough" };
   }
-  if (isError) {
+  if (isError || input.preserveVerbatim) {
     metrics.totalPassthroughs++;
     return { action: "passthrough" };
   }
   if (!input.supported || !input.text) {
     metrics.totalUnsupportedShapes++;
-    logger.log("warn", "unsupported_shape", { tool: toolName, sourceShape });
+    logger.log("warn", "unsupported_shape", { tool: toolName, sourceShape, ...input.shapeDiagnostics });
     return { action: "unsupported_shape" };
   }
   const text = input.text;
@@ -1074,7 +1074,7 @@ function commitObserved(event, metrics, logger) {
 }
 
 // adapters/claude-code/headroom-intercept/nexus-headroom-intercept.ts
-var PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.16" };
+var PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.17" };
 var DEFAULT_MODE = "observe";
 var DEBUG = process.env.HEADROOM_DEBUG === "true";
 var GATE_STATE_FILE = "headroom-gate-state.json";
@@ -1092,21 +1092,62 @@ function normalizeClaudeToolName(toolName) {
   if (server === "nexus") return `nexus_${rest}`;
   return toolName;
 }
+function fromContentBlocks(blocks, sourceShape) {
+  const textParts = blocks.filter((b) => b?.type === "text" && typeof b.text === "string");
+  return {
+    text: textParts.map((p) => p.text).join("\n"),
+    supported: textParts.length > 0,
+    sourceShape,
+    preserveVerbatim: textParts.length > 0 && textParts.length < blocks.length
+  };
+}
 function normalizeClaudeToolResponse(toolResponse) {
   if (typeof toolResponse === "string" && toolResponse.length > 0) {
-    return { text: toolResponse, supported: true, sourceShape: "string" };
+    return { text: toolResponse, supported: true, sourceShape: "string", preserveVerbatim: false };
   }
-  if (toolResponse && typeof toolResponse === "object" && Array.isArray(toolResponse.content)) {
-    const textParts = toolResponse.content.filter(
-      (part) => part?.type === "text" && typeof part.text === "string"
-    );
+  if (Array.isArray(toolResponse)) {
+    return fromContentBlocks(toolResponse, "mcp-content-array");
+  }
+  if (toolResponse && typeof toolResponse === "object") {
+    const obj = toolResponse;
+    const isError = obj.isError === true;
+    if (Array.isArray(obj.content)) {
+      const r = fromContentBlocks(obj.content, "mcp-content");
+      if (r.supported || obj.structuredContent === void 0) return { ...r, preserveVerbatim: r.preserveVerbatim || isError };
+    }
+    if (typeof obj.content === "string" && obj.content.length > 0) {
+      return { text: obj.content, supported: true, sourceShape: "mcp-content-string", preserveVerbatim: isError };
+    }
+    if (obj.structuredContent !== void 0 && obj.structuredContent !== null) {
+      return {
+        text: JSON.stringify(obj.structuredContent),
+        supported: true,
+        sourceShape: "mcp-structured-content",
+        preserveVerbatim: isError
+      };
+    }
+  }
+  return { text: "", supported: false, sourceShape: "unknown", preserveVerbatim: false };
+}
+function describeResponseShape(toolResponse) {
+  const blockKeys = (v) => v && typeof v === "object" && !Array.isArray(v) ? Object.keys(v) : typeof v;
+  if (Array.isArray(toolResponse)) {
+    return { responseType: "array", responseLength: toolResponse.length, firstBlockKeys: blockKeys(toolResponse[0]) };
+  }
+  if (toolResponse && typeof toolResponse === "object") {
+    const content = toolResponse.content;
     return {
-      text: textParts.map((p) => p.text).join("\n"),
-      supported: textParts.length > 0,
-      sourceShape: "mcp-content"
+      responseType: "object",
+      topLevelKeys: Object.keys(toolResponse),
+      ...Array.isArray(content) ? { firstBlockKeys: blockKeys(content[0]) } : {}
     };
   }
-  return { text: "", supported: false, sourceShape: "unknown" };
+  return { responseType: toolResponse === null ? "null" : typeof toolResponse };
+}
+function toUpdatedToolOutput(compact, sourceShape) {
+  if (sourceShape === "string") return compact;
+  const blocks = [{ type: "text", text: compact }];
+  return sourceShape === "mcp-content-array" ? blocks : { content: blocks };
 }
 async function computeGate(directory, logger) {
   let mode = process.env.HEADROOM_MODE ?? DEFAULT_MODE;
@@ -1173,8 +1214,10 @@ async function handlePostToolUse(input, logger) {
       supported: normalized.supported,
       sourceShape: normalized.sourceShape,
       isError: false,
-      // Claude Code's PostToolUse does not surface a distinct isError flag on tool_response
-      mode: gate.mode
+      // PostToolUse only fires on success; an explicit isError on the object shape is folded into preserveVerbatim
+      mode: gate.mode,
+      preserveVerbatim: normalized.preserveVerbatim,
+      shapeDiagnostics: normalized.supported ? void 0 : describeResponseShape(input.tool_response)
     },
     metrics,
     store,
@@ -1190,11 +1233,10 @@ async function handlePostToolUse(input, logger) {
     return {
       hookSpecificOutput: {
         hookEventName: "PostToolUse",
-        // Confirmed field name (2026-09-20, official hooks reference). Plain
-        // string is safe: this plugin's policy table never targets built-in
-        // tools (see file header caveat), only nexus_/headroom_-prefixed MCP
-        // tools, whose output is not schema-validated by Claude Code.
-        updatedToolOutput: result.compact
+        // Confirmed field name (2026-09-20, official hooks reference). MCP
+        // output is not schema-validated, but the replacement still mirrors
+        // the source shape (bare content-block array for live MCP calls).
+        updatedToolOutput: toUpdatedToolOutput(result.compact, normalized.sourceShape)
       }
     };
   } catch (err) {
@@ -1207,7 +1249,13 @@ function handleStop(directory, logger, sessionId) {
   const metrics = loadMetricsForSession(directory, sessionId);
   const hasActivity = metrics.events.length > 0 || metrics.totalCacheIntegrityFailures > 0 || metrics.totalOutputBudgetTruncated > 0 || metrics.totalUnsupportedShapes > 0 || metrics.totalCacheReadFailures > 0;
   if (hasActivity) {
+    const gate = loadState(directory, GATE_STATE_FILE, null);
+    const requestedMode = gate?.requestedMode ?? process.env.HEADROOM_MODE ?? DEFAULT_MODE;
     logger.log("info", "session_summary", {
+      session_id: sessionId ?? null,
+      mode: gate?.mode ?? requestedMode,
+      requestedMode,
+      downgradeReason: gate?.downgradeReason ?? null,
       compressions: metrics.totalCompressions,
       locallyAppliedTransforms: metrics.locallyAppliedTransforms,
       observations: metrics.totalObservations,
@@ -1269,6 +1317,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 export {
   debugRetrieve,
+  describeResponseShape,
   handlePostToolUse,
   handleStop,
   normalizeClaudeToolName,

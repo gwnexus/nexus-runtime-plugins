@@ -37,6 +37,10 @@ export interface InterceptInput {
   sourceShape: string
   isError: boolean
   mode: PluginMode
+  /** Response carries content that must not be replaced (e.g. non-text blocks); treated like isError. */
+  preserveVerbatim?: boolean
+  /** Structure-only diagnostics (never content) attached to `unsupported_shape` log lines. */
+  shapeDiagnostics?: Record<string, unknown>
 }
 
 export function intercept(
@@ -70,14 +74,14 @@ export function intercept(
   }
 
   // Never compress error responses — must be preserved verbatim.
-  if (isError) {
+  if (isError || input.preserveVerbatim) {
     metrics.totalPassthroughs++
     return { action: "passthrough" }
   }
 
   if (!input.supported || !input.text) {
     metrics.totalUnsupportedShapes++
-    logger.log("warn", "unsupported_shape", { tool: toolName, sourceShape })
+    logger.log("warn", "unsupported_shape", { tool: toolName, sourceShape, ...input.shapeDiagnostics })
     return { action: "unsupported_shape" }
   }
 

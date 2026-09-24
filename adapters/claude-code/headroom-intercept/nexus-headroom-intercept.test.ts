@@ -39,7 +39,13 @@ vi.mock("../../../core/headroom-intercept/config.ts", () => ({
   fetchProjectContext: vi.fn(async () => null),
 }))
 
-import { normalizeClaudeToolResponse, normalizeClaudeToolName, handlePostToolUse, handleStop } from "./nexus-headroom-intercept.ts"
+import {
+  normalizeClaudeToolResponse,
+  normalizeClaudeToolName,
+  describeResponseShape,
+  handlePostToolUse,
+  handleStop,
+} from "./nexus-headroom-intercept.ts"
 import { StructuredLogger } from "../../../core/headroom-intercept/structured-logger.ts"
 
 function fakeLogger(): StructuredLogger {
@@ -49,6 +55,16 @@ function fakeLogger(): StructuredLogger {
 const bigText = JSON.stringify({
   items: Array.from({ length: 40 }, (_, i) => ({ title: `Task ${i}: ${"description ".repeat(40)}`, id: `id-${i}`, status: "open" })),
 })
+
+/**
+ * Fixture from a live capture (Dispatch 1bc7ff92, 2026-09-24): a real Claude
+ * Code session calling `mcp__nexus__kb_search`, logged by a temporary
+ * PostToolUse hook that recorded structure only. Observed: `tool_response` is
+ * an array of length 1 whose block has keys `type` (string) and `text`
+ * (string). Hook input also carries `mcp_server` and `tool_use_id`. Text
+ * content below is synthetic.
+ */
+const LIVE_MCP_TOOL_RESPONSE = [{ type: "text", text: bigText }]
 
 describe("headroom-intercept Claude Code adapter", () => {
   const cwd = "/tmp/test-project-headroom"
@@ -81,6 +97,59 @@ describe("headroom-intercept Claude Code adapter", () => {
       const r = normalizeClaudeToolResponse(42)
       expect(r.supported).toBe(false)
       expect(r.sourceShape).toBe("unknown")
+    })
+
+    it("handles the live Claude Code MCP shape: bare content-block array", () => {
+      const r = normalizeClaudeToolResponse(LIVE_MCP_TOOL_RESPONSE)
+      expect(r.supported).toBe(true)
+      expect(r.text).toBe(LIVE_MCP_TOOL_RESPONSE[0].text)
+      expect(r.sourceShape).toBe("mcp-content-array")
+      expect(r.preserveVerbatim).toBe(false)
+    })
+
+    it("handles { content: string }", () => {
+      const r = normalizeClaudeToolResponse({ content: "abc" })
+      expect(r.supported).toBe(true)
+      expect(r.text).toBe("abc")
+      expect(r.sourceShape).toBe("mcp-content-string")
+    })
+
+    it("treats structuredContent as JSON text when no text blocks exist", () => {
+      const r = normalizeClaudeToolResponse({ content: [], structuredContent: { a: 1 } })
+      expect(r.supported).toBe(true)
+      expect(r.text).toBe('{"a":1}')
+      expect(r.sourceShape).toBe("mcp-structured-content")
+    })
+
+    it("prefers text blocks over structuredContent", () => {
+      const r = normalizeClaudeToolResponse({ content: [{ type: "text", text: "t" }], structuredContent: { a: 1 } })
+      expect(r.text).toBe("t")
+      expect(r.sourceShape).toBe("mcp-content")
+    })
+
+    it("marks mixed text + non-text blocks as preserveVerbatim", () => {
+      const r = normalizeClaudeToolResponse([{ type: "text", text: "t" }, { type: "image", data: "x", mimeType: "image/png" }])
+      expect(r.preserveVerbatim).toBe(true)
+    })
+
+    it("marks only-non-text blocks as unsupported", () => {
+      const r = normalizeClaudeToolResponse([{ type: "image", data: "x", mimeType: "image/png" }])
+      expect(r.supported).toBe(false)
+    })
+
+    it("marks isError object responses as preserveVerbatim", () => {
+      const r = normalizeClaudeToolResponse({ content: [{ type: "text", text: "boom" }], isError: true })
+      expect(r.preserveVerbatim).toBe(true)
+    })
+  })
+
+  describe("describeResponseShape", () => {
+    it("describes structure only, never content", () => {
+      const secret = "SECRET-CONTENT"
+      const d = describeResponseShape([{ type: "text", text: secret }])
+      expect(d).toEqual({ responseType: "array", responseLength: 1, firstBlockKeys: ["type", "text"] })
+      expect(JSON.stringify(describeResponseShape({ content: [{ type: "text", text: secret }], other: secret }))).not.toContain(secret)
+      expect(describeResponseShape(null)).toEqual({ responseType: "null" })
     })
   })
 
@@ -151,7 +220,7 @@ describe("headroom-intercept Claude Code adapter", () => {
         expect(result).not.toBeNull()
         const payload = result as any
         expect(payload.hookSpecificOutput.hookEventName).toBe("PostToolUse")
-        expect(payload.hookSpecificOutput.updatedToolOutput).toContain("[HEADROOM:v1]")
+        expect(payload.hookSpecificOutput.updatedToolOutput.content[0].text).toContain("[HEADROOM:v1]")
       } finally {
         process.env.HEADROOM_MODE = prev
       }
@@ -176,14 +245,71 @@ describe("headroom-intercept Claude Code adapter", () => {
         )
         expect(result).not.toBeNull()
         const payload = result as any
-        expect(payload.hookSpecificOutput.updatedToolOutput).toContain("[HEADROOM:v1]")
+        expect(payload.hookSpecificOutput.updatedToolOutput.content[0].text).toContain("[HEADROOM:v1]")
       } finally {
         process.env.HEADROOM_MODE = prev
       }
     })
   })
 
+  describe("handlePostToolUse with the live Claude Code shape", () => {
+    it("compresses a bare content-block array and returns the same shape", async () => {
+      process.env.HEADROOM_MODE = "transform"
+      const logger = fakeLogger()
+      const result = await handlePostToolUse(
+        { cwd, tool_name: "mcp__nexus__kb_memory", tool_response: LIVE_MCP_TOOL_RESPONSE },
+        logger,
+      )
+      const out = (result as any).hookSpecificOutput.updatedToolOutput
+      expect(Array.isArray(out)).toBe(true)
+      expect(out).toHaveLength(1)
+      expect(out[0].type).toBe("text")
+      expect(out[0].text).toContain("[HEADROOM:v1]")
+      expect(logger.log).not.toHaveBeenCalledWith("warn", "unsupported_shape", expect.anything())
+    })
+
+    it("does not replace responses with non-text blocks", async () => {
+      process.env.HEADROOM_MODE = "transform"
+      const logger = fakeLogger()
+      const result = await handlePostToolUse(
+        {
+          cwd,
+          tool_name: "mcp__nexus__kb_memory",
+          tool_response: [...LIVE_MCP_TOOL_RESPONSE, { type: "image", data: "x", mimeType: "image/png" }],
+        },
+        logger,
+      )
+      expect(result).toBeNull()
+    })
+
+    it("logs structure-only diagnostics on unsupported_shape", async () => {
+      const logger = fakeLogger()
+      await handlePostToolUse({ cwd, tool_name: "mcp__nexus__kb_memory", tool_response: { weird: "SECRET" } }, logger)
+      expect(logger.log).toHaveBeenCalledWith(
+        "warn",
+        "unsupported_shape",
+        expect.objectContaining({ tool: "nexus_kb_memory", sourceShape: "unknown", responseType: "object", topLevelKeys: ["weird"] }),
+      )
+      expect(JSON.stringify((logger.log as any).mock.calls)).not.toContain("SECRET")
+    })
+  })
+
   describe("handleStop", () => {
+    it("includes session_id, mode and requestedMode in session_summary", async () => {
+      process.env.HEADROOM_MODE = "transform"
+      const logger = fakeLogger()
+      await handlePostToolUse(
+        { cwd, tool_name: "mcp__nexus__kb_memory", tool_response: LIVE_MCP_TOOL_RESPONSE, session_id: "s-mode" },
+        logger,
+      )
+      handleStop(cwd, logger, "s-mode")
+      expect(logger.log).toHaveBeenCalledWith(
+        "info",
+        "session_summary",
+        expect.objectContaining({ session_id: "s-mode", mode: "transform", requestedMode: "transform", downgradeReason: null, compressions: 1 }),
+      )
+    })
+
     it("does not throw when there is no accumulated activity", () => {
       const logger = fakeLogger()
       expect(() => handleStop(cwd, logger)).not.toThrow()

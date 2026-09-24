@@ -98,7 +98,7 @@ import type { PluginMode, SessionMetrics } from "../../../core/headroom-intercep
 import { wrapRetrievedContent } from "../../../core/headroom-intercept/compression.ts"
 import { intercept, commitTransformed, commitTransformFailed } from "../../../core/headroom-intercept/engine.ts"
 
-const PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.16" } as const
+const PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.17" } as const
 
 const DEFAULT_MODE: PluginMode = "observe"
 const DEBUG = process.env.HEADROOM_DEBUG === "true"
@@ -128,10 +128,20 @@ interface ClaudeHookInput {
   session_id?: string
 }
 
+type SourceShape =
+  | "string"
+  | "mcp-content-array"
+  | "mcp-content"
+  | "mcp-content-string"
+  | "mcp-structured-content"
+  | "unknown"
+
 interface NormalizedResult {
   text: string
   supported: boolean
-  sourceShape: "string" | "mcp-content" | "unknown"
+  sourceShape: SourceShape
+  /** Non-text blocks or an error flag present: the original must not be replaced. */
+  preserveVerbatim: boolean
 }
 
 /**
@@ -153,22 +163,76 @@ export function normalizeClaudeToolName(toolName: string): string {
   return toolName
 }
 
-/** Normalize Claude Code's tool_response shape into plain text for the core engine. */
+function fromContentBlocks(blocks: unknown[], sourceShape: SourceShape): NormalizedResult {
+  const textParts = blocks.filter((b: any) => b?.type === "text" && typeof b.text === "string") as { text: string }[]
+  return {
+    text: textParts.map((p) => p.text).join("\n"),
+    supported: textParts.length > 0,
+    sourceShape,
+    preserveVerbatim: textParts.length > 0 && textParts.length < blocks.length,
+  }
+}
+
+/**
+ * Normalize Claude Code's tool_response shape into plain text for the core engine.
+ *
+ * Captured live (Claude Code 2.1.x, Dispatch 1bc7ff92, 2026-09-24): for MCP
+ * tools, PostToolUse `tool_response` is a BARE ARRAY of content blocks
+ * (`[{ type: "text", text }]`), not `{ content: [...] }`. The object forms are
+ * still accepted defensively. Any non-text block marks the response
+ * `preserveVerbatim` so it is never replaced by a text-only compaction.
+ */
 export function normalizeClaudeToolResponse(toolResponse: unknown): NormalizedResult {
   if (typeof toolResponse === "string" && toolResponse.length > 0) {
-    return { text: toolResponse, supported: true, sourceShape: "string" }
+    return { text: toolResponse, supported: true, sourceShape: "string", preserveVerbatim: false }
   }
-  if (toolResponse && typeof toolResponse === "object" && Array.isArray((toolResponse as any).content)) {
-    const textParts = (toolResponse as any).content.filter(
-      (part: any) => part?.type === "text" && typeof part.text === "string",
-    )
-    return {
-      text: textParts.map((p: any) => p.text).join("\n"),
-      supported: textParts.length > 0,
-      sourceShape: "mcp-content",
+  if (Array.isArray(toolResponse)) {
+    return fromContentBlocks(toolResponse, "mcp-content-array")
+  }
+  if (toolResponse && typeof toolResponse === "object") {
+    const obj = toolResponse as Record<string, unknown>
+    const isError = obj.isError === true
+    if (Array.isArray(obj.content)) {
+      const r = fromContentBlocks(obj.content, "mcp-content")
+      if (r.supported || obj.structuredContent === undefined) return { ...r, preserveVerbatim: r.preserveVerbatim || isError }
+    }
+    if (typeof obj.content === "string" && obj.content.length > 0) {
+      return { text: obj.content, supported: true, sourceShape: "mcp-content-string", preserveVerbatim: isError }
+    }
+    if (obj.structuredContent !== undefined && obj.structuredContent !== null) {
+      return {
+        text: JSON.stringify(obj.structuredContent),
+        supported: true,
+        sourceShape: "mcp-structured-content",
+        preserveVerbatim: isError,
+      }
     }
   }
-  return { text: "", supported: false, sourceShape: "unknown" }
+  return { text: "", supported: false, sourceShape: "unknown", preserveVerbatim: false }
+}
+
+/** Structure-only description of a tool_response for diagnostics. Never includes content. */
+export function describeResponseShape(toolResponse: unknown): Record<string, unknown> {
+  const blockKeys = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? Object.keys(v) : typeof v)
+  if (Array.isArray(toolResponse)) {
+    return { responseType: "array", responseLength: toolResponse.length, firstBlockKeys: blockKeys(toolResponse[0]) }
+  }
+  if (toolResponse && typeof toolResponse === "object") {
+    const content = (toolResponse as Record<string, unknown>).content
+    return {
+      responseType: "object",
+      topLevelKeys: Object.keys(toolResponse),
+      ...(Array.isArray(content) ? { firstBlockKeys: blockKeys(content[0]) } : {}),
+    }
+  }
+  return { responseType: toolResponse === null ? "null" : typeof toolResponse }
+}
+
+/** Mirror the source shape in `updatedToolOutput` so the replacement matches what Claude Code sent. */
+function toUpdatedToolOutput(compact: string, sourceShape: SourceShape): unknown {
+  if (sourceShape === "string") return compact
+  const blocks = [{ type: "text", text: compact }]
+  return sourceShape === "mcp-content-array" ? blocks : { content: blocks }
 }
 
 async function computeGate(directory: string, logger: StructuredLogger): Promise<GateState> {
@@ -254,8 +318,10 @@ export async function handlePostToolUse(
       text: normalized.text || null,
       supported: normalized.supported,
       sourceShape: normalized.sourceShape,
-      isError: false, // Claude Code's PostToolUse does not surface a distinct isError flag on tool_response
+      isError: false, // PostToolUse only fires on success; an explicit isError on the object shape is folded into preserveVerbatim
       mode: gate.mode,
+      preserveVerbatim: normalized.preserveVerbatim,
+      shapeDiagnostics: normalized.supported ? undefined : describeResponseShape(input.tool_response),
     },
     metrics,
     store,
@@ -274,11 +340,10 @@ export async function handlePostToolUse(
     return {
       hookSpecificOutput: {
         hookEventName: "PostToolUse",
-        // Confirmed field name (2026-09-20, official hooks reference). Plain
-        // string is safe: this plugin's policy table never targets built-in
-        // tools (see file header caveat), only nexus_/headroom_-prefixed MCP
-        // tools, whose output is not schema-validated by Claude Code.
-        updatedToolOutput: result.compact,
+        // Confirmed field name (2026-09-20, official hooks reference). MCP
+        // output is not schema-validated, but the replacement still mirrors
+        // the source shape (bare content-block array for live MCP calls).
+        updatedToolOutput: toUpdatedToolOutput(result.compact, normalized.sourceShape),
       },
     }
   } catch (err) {
@@ -299,7 +364,15 @@ export function handleStop(directory: string, logger: StructuredLogger, sessionI
     metrics.totalCacheReadFailures > 0
 
   if (hasActivity) {
+    // Stop must not hit the network: read the gate cached by PostToolUse
+    // (TTL ignored here); fall back to the requested mode if none exists yet.
+    const gate = loadState<GateState | null>(directory, GATE_STATE_FILE, null)
+    const requestedMode = gate?.requestedMode ?? (process.env.HEADROOM_MODE as PluginMode) ?? DEFAULT_MODE
     logger.log("info", "session_summary", {
+      session_id: sessionId ?? null,
+      mode: gate?.mode ?? requestedMode,
+      requestedMode,
+      downgradeReason: gate?.downgradeReason ?? null,
       compressions: metrics.totalCompressions,
       locallyAppliedTransforms: metrics.locallyAppliedTransforms,
       observations: metrics.totalObservations,
