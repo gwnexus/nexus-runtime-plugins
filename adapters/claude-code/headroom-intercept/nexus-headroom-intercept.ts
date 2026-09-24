@@ -56,8 +56,22 @@
  *  3. Session summary: OpenCode emits ` session.idle`; Claude Code has no
  *     equivalent (see capability-matrix `cost_control` entry for the same
  *     gap in a different plugin). Metrics are persisted to
- *     `.nexus/headroom-metrics-state.json` between invocations and flushed
- *     as a `session_summary` log line on the `Stop` hook.
+ *     `.nexus/headroom-metrics-state.json` between invocations, accumulated
+ *     cumulatively across the whole session (Fix §3, Dispatch 0e38cf7b: a
+ *     new `session_id` reported by the hook input is the only reset
+ *     trigger; the `Stop` hook fires after every assistant turn, not once
+ *     per session, so resetting on every `Stop` previously caused
+ *     `nexus-cli` to observe only the last turn's numbers), and flushed as a
+ *     cumulative `session_summary` log line on every `Stop`.
+ *
+ * Fix log (Dispatch 0e38cf7b, 2026-09-24):
+ *   §1 Tool-name mismatch — `mcp__<server>__<tool>` MCP tool names are now
+ *      normalized to the core policy table's naming convention
+ *      (`normalizeClaudeToolName`) before policy lookup.
+ *   §2 Credential-source drift — see `core/headroom-intercept/config.ts` for
+ *      the updated resolution order (env, `.mcp.json`, `opencode.json`,
+ *      project-local `.nexus/config.toml`+`credentials.toml`, global).
+ *   §3 Per-turn vs per-session stats — see above.
  *
  * Hook configuration (.claude/settings.json):
  *
@@ -84,12 +98,13 @@ import type { PluginMode, SessionMetrics } from "../../../core/headroom-intercep
 import { wrapRetrievedContent } from "../../../core/headroom-intercept/compression.ts"
 import { intercept, commitTransformed, commitTransformFailed } from "../../../core/headroom-intercept/engine.ts"
 
-const PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.14" } as const
+const PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.15" } as const
 
 const DEFAULT_MODE: PluginMode = "observe"
 const DEBUG = process.env.HEADROOM_DEBUG === "true"
 const GATE_STATE_FILE = "headroom-gate-state.json"
 const METRICS_STATE_FILE = "headroom-metrics-state.json"
+const SESSION_ID_STATE_FILE = "headroom-session-id.json"
 const GATE_TTL_MS = 10 * 60 * 1000 // 10 minutes
 
 /** Read fresh on every gate computation (not cached at module load) so tests and
@@ -110,12 +125,32 @@ interface ClaudeHookInput {
   cwd?: string
   tool_name?: string
   tool_response?: unknown
+  session_id?: string
 }
 
 interface NormalizedResult {
   text: string
   supported: boolean
   sourceShape: "string" | "mcp-content" | "unknown"
+}
+
+/**
+ * Normalize Claude Code's MCP tool name into the core policy table's naming
+ * convention (Fix §1, Dispatch 0e38cf7b). Claude Code passes MCP tools as
+ * `mcp__<server>__<tool>` (e.g. `mcp__nexus__kb_memory`,
+ * `mcp__nexus-headroom__headroom_retrieve`), while the core policy table
+ * (`core/headroom-intercept/policies.ts`) only knows OpenCode-style names
+ * (`nexus_kb_memory`, `headroom_retrieve`). Without this normalization every
+ * Claude Code MCP tool call falls through `lookupPolicy()` as a no-match
+ * skip, so the plugin never compresses anything.
+ */
+export function normalizeClaudeToolName(toolName: string): string {
+  const mcpMatch = toolName.match(/^mcp__([^_]+(?:-[^_]+)*)__(.+)$/)
+  if (!mcpMatch) return toolName
+  const [, server, rest] = mcpMatch
+  if (server === "nexus-headroom") return rest
+  if (server === "nexus") return `nexus_${rest}`
+  return toolName
 }
 
 /** Normalize Claude Code's tool_response shape into plain text for the core engine. */
@@ -180,18 +215,37 @@ async function getGate(directory: string, logger: StructuredLogger): Promise<Gat
   return fresh
 }
 
+/**
+ * Load accumulated metrics for the current session (Fix §3, Dispatch
+ * 0e38cf7b). Claude Code fires `Stop` after every assistant turn, not once
+ * per session, so metrics must persist across turns and only reset when the
+ * `session_id` reported by the hook input actually changes (a genuinely new
+ * session starting), not on every `Stop`.
+ */
+function loadMetricsForSession(directory: string, sessionId: string | undefined): SessionMetrics {
+  const lastSessionId = loadState<string | null>(directory, SESSION_ID_STATE_FILE, null)
+  if (sessionId && lastSessionId !== sessionId) {
+    saveState(directory, SESSION_ID_STATE_FILE, sessionId)
+    const fresh = initialMetrics()
+    saveState(directory, METRICS_STATE_FILE, fresh)
+    return fresh
+  }
+  return loadState<SessionMetrics>(directory, METRICS_STATE_FILE, initialMetrics())
+}
+
 /** Testable handler for the `post-tool-use` mode. */
 export async function handlePostToolUse(
   input: ClaudeHookInput,
   logger: StructuredLogger,
 ): Promise<Record<string, unknown> | null> {
   const directory = input.cwd ?? process.cwd()
-  const toolName = String(input.tool_name ?? "")
-  if (!toolName) return null
+  const rawToolName = String(input.tool_name ?? "")
+  if (!rawToolName) return null
+  const toolName = normalizeClaudeToolName(rawToolName)
 
   const gate = await getGate(directory, logger)
   const store = new OriginalStore(directory, gate.projectId)
-  const metrics = loadState<SessionMetrics>(directory, METRICS_STATE_FILE, initialMetrics())
+  const metrics = loadMetricsForSession(directory, input.session_id)
 
   const normalized = normalizeClaudeToolResponse(input.tool_response)
   const result = intercept(
@@ -234,9 +288,9 @@ export async function handlePostToolUse(
   }
 }
 
-/** Testable handler for the `stop` mode — flush accumulated metrics as a session_summary. */
-export function handleStop(directory: string, logger: StructuredLogger): void {
-  const metrics = loadState<SessionMetrics>(directory, METRICS_STATE_FILE, initialMetrics())
+/** Testable handler for the `stop` mode — flush accumulated metrics as a cumulative session_summary. */
+export function handleStop(directory: string, logger: StructuredLogger, sessionId?: string): void {
+  const metrics = loadMetricsForSession(directory, sessionId)
   const hasActivity =
     metrics.events.length > 0 ||
     metrics.totalCacheIntegrityFailures > 0 ||
@@ -259,8 +313,9 @@ export function handleStop(directory: string, logger: StructuredLogger): void {
       cacheReadFailures: metrics.totalCacheReadFailures,
     })
   }
-  // Reset for the next turn/session.
-  saveState(directory, METRICS_STATE_FILE, initialMetrics())
+  // Cumulative across the whole session — do NOT reset here. Metrics only
+  // reset when loadMetricsForSession() detects a new session_id (see Fix §3
+  // docstring above).
 }
 
 /** Manual/debugging-only retrieval, NOT exposed to the agent (see file header). */
@@ -302,7 +357,7 @@ async function main(): Promise<void> {
   }
 
   if (mode === "stop") {
-    handleStop(directory, logger)
+    handleStop(directory, logger, input.session_id)
     process.exit(0)
   }
 

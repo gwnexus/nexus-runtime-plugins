@@ -39,7 +39,7 @@ vi.mock("../../../core/headroom-intercept/config.ts", () => ({
   fetchProjectContext: vi.fn(async () => null),
 }))
 
-import { normalizeClaudeToolResponse, handlePostToolUse, handleStop } from "./nexus-headroom-intercept.ts"
+import { normalizeClaudeToolResponse, normalizeClaudeToolName, handlePostToolUse, handleStop } from "./nexus-headroom-intercept.ts"
 import { StructuredLogger } from "../../../core/headroom-intercept/structured-logger.ts"
 
 function fakeLogger(): StructuredLogger {
@@ -81,6 +81,25 @@ describe("headroom-intercept Claude Code adapter", () => {
       const r = normalizeClaudeToolResponse(42)
       expect(r.supported).toBe(false)
       expect(r.sourceShape).toBe("unknown")
+    })
+  })
+
+  describe("normalizeClaudeToolName", () => {
+    it("normalizes mcp__nexus__X to nexus_X", () => {
+      expect(normalizeClaudeToolName("mcp__nexus__kb_memory")).toBe("nexus_kb_memory")
+    })
+
+    it("normalizes mcp__nexus-headroom__X to X", () => {
+      expect(normalizeClaudeToolName("mcp__nexus-headroom__headroom_retrieve")).toBe("headroom_retrieve")
+    })
+
+    it("leaves non-mcp tool names unchanged", () => {
+      expect(normalizeClaudeToolName("nexus_kb_memory")).toBe("nexus_kb_memory")
+      expect(normalizeClaudeToolName("Read")).toBe("Read")
+    })
+
+    it("leaves unrecognized mcp server names unchanged", () => {
+      expect(normalizeClaudeToolName("mcp__some-other-server__tool")).toBe("mcp__some-other-server__tool")
     })
   })
 
@@ -145,6 +164,23 @@ describe("headroom-intercept Claude Code adapter", () => {
       // No assertion error means state persisted/loaded correctly across two calls sharing `cwd`.
       expect(true).toBe(true)
     })
+
+    it("recognizes mcp__nexus__X tool names via the same policy path as nexus_X", async () => {
+      const prev = process.env.HEADROOM_MODE
+      process.env.HEADROOM_MODE = "transform"
+      try {
+        const logger = fakeLogger()
+        const result = await handlePostToolUse(
+          { cwd, tool_name: "mcp__nexus__kb_memory", tool_response: { content: [{ type: "text", text: bigText }] } },
+          logger,
+        )
+        expect(result).not.toBeNull()
+        const payload = result as any
+        expect(payload.hookSpecificOutput.updatedToolOutput).toContain("[HEADROOM:v1]")
+      } finally {
+        process.env.HEADROOM_MODE = prev
+      }
+    })
   })
 
   describe("handleStop", () => {
@@ -153,16 +189,50 @@ describe("headroom-intercept Claude Code adapter", () => {
       expect(() => handleStop(cwd, logger)).not.toThrow()
     })
 
-    it("logs a session_summary and resets metrics when there was activity", async () => {
+    it("logs a cumulative session_summary and does NOT reset metrics within the same session", async () => {
       const prev = process.env.HEADROOM_MODE
       process.env.HEADROOM_MODE = "transform"
       try {
         const logger = fakeLogger()
         await handlePostToolUse(
-          { cwd, tool_name: "nexus_kb_memory", tool_response: { content: [{ type: "text", text: bigText }] } },
+          { cwd, tool_name: "nexus_kb_memory", tool_response: { content: [{ type: "text", text: bigText }] }, session_id: "s1" },
           logger,
         )
-        handleStop(cwd, logger)
+        handleStop(cwd, logger, "s1")
+        expect(logger.log).toHaveBeenCalledWith("info", "session_summary", expect.objectContaining({ compressions: 1 }))
+
+        // Simulate a second turn within the SAME session (session_id unchanged):
+        // Stop fires again, but metrics must still reflect the cumulative total,
+        // not be reset back to zero.
+        await handlePostToolUse(
+          { cwd, tool_name: "nexus_kb_memory", tool_response: { content: [{ type: "text", text: bigText }] }, session_id: "s1" },
+          logger,
+        )
+        handleStop(cwd, logger, "s1")
+        expect(logger.log).toHaveBeenCalledWith("info", "session_summary", expect.objectContaining({ compressions: 2 }))
+      } finally {
+        process.env.HEADROOM_MODE = prev
+      }
+    })
+
+    it("resets metrics when a new session_id is observed", async () => {
+      const prev = process.env.HEADROOM_MODE
+      process.env.HEADROOM_MODE = "transform"
+      try {
+        const logger = fakeLogger()
+        await handlePostToolUse(
+          { cwd, tool_name: "nexus_kb_memory", tool_response: { content: [{ type: "text", text: bigText }] }, session_id: "session-a" },
+          logger,
+        )
+        handleStop(cwd, logger, "session-a")
+        expect(logger.log).toHaveBeenCalledWith("info", "session_summary", expect.objectContaining({ compressions: 1 }))
+
+        // New session_id -> metrics must reset, not carry over the prior session's count.
+        await handlePostToolUse(
+          { cwd, tool_name: "nexus_kb_memory", tool_response: { content: [{ type: "text", text: bigText }] }, session_id: "session-b" },
+          logger,
+        )
+        handleStop(cwd, logger, "session-b")
         expect(logger.log).toHaveBeenCalledWith("info", "session_summary", expect.objectContaining({ compressions: 1 }))
       } finally {
         process.env.HEADROOM_MODE = prev
