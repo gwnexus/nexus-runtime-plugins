@@ -42,71 +42,133 @@ jobs:
 
       - name: Package plugins
         run: |
+          set -euo pipefail
           mkdir -p dist
 
-          # Individual plugin zips (plugin source + README) — remaining flat,
+          # zip -j (junk paths) collides whenever two source files share a
+          # basename -- e.g. adapters/opencode/session-guard/README.md vs
+          # adapters/claude-code/session-guard/README.md, or the two
+          # runtimes' identically-named nexus-*.ts adapter files. Stage each
+          # zip's contents into a scratch directory with adapter-prefixed
+          # names first, then zip the scratch directory flat (still -j, but
+          # collision-free by construction) instead of passing the original
+          # repo paths straight to zip.
+          stage() {
+            local zipfile="$1"; shift
+            local stagedir
+            stagedir=$(mktemp -d)
+            while [ "$#" -gt 0 ]; do
+              local src="$1" dest="$2"; shift 2
+              cp "$src" "$stagedir/$dest"
+            done
+            (cd "$stagedir" && zip -j "$OLDPWD/$zipfile" ./*)
+            rm -rf "$stagedir"
+          }
+
+          # Individual plugin zip (plugin source + README) — remaining flat,
           # non-migrated plugin(s). 600-attribution-headers is explicitly not
           # ported to Claude Code per ADR-C08 and stays flat indefinitely.
           for dir in 600-attribution-headers; do
             plugin_name=$(basename "$dir")
             zip -j "dist/${plugin_name}.zip" "${dir}"/*.ts "${dir}"/README.md
           done
-          zip -j dist/session-guard.zip \
-            adapters/opencode/session-guard/nexus-session-guard.ts \
-            adapters/opencode/session-guard/README.md \
-            adapters/claude-code/session-guard/nexus-session-guard.ts \
-            adapters/claude-code/session-guard/README.md \
-            core/logger.ts \
-            core/state-store.ts \
-            core/session-guard/logic.ts
-          zip -j dist/headroom-intercept.zip \
-            adapters/opencode/headroom-intercept/nexus-headroom-intercept.ts \
-            adapters/opencode/headroom-intercept/README.md \
-            adapters/claude-code/headroom-intercept/nexus-headroom-intercept.ts \
-            adapters/claude-code/headroom-intercept/README.md \
-            core/headroom-intercept/*.ts
-          zip -j dist/compaction-plus.zip \
-            adapters/opencode/compaction-plus/nexus-compaction-plus.ts \
-            adapters/opencode/compaction-plus/README.md \
-            adapters/claude-code/compaction-plus/nexus-compaction-plus.ts \
-            adapters/claude-code/compaction-plus/README.md \
-            core/compaction-plus/*.ts \
-            core/logger.ts
-          zip -j dist/routing-guard.zip \
-            adapters/opencode/routing-guard/nexus-routing-guard.ts \
-            adapters/opencode/routing-guard/README.md \
-            adapters/claude-code/routing-guard/nexus-routing-guard.ts \
-            adapters/claude-code/routing-guard/README.md \
-            core/routing-guard/*.ts \
-            core/logger.ts
-          zip -j dist/cost-control.zip \
-            adapters/opencode/cost-control/nexus-cost-control.ts \
-            adapters/opencode/cost-control/README.md \
-            adapters/claude-code/cost-control/nexus-cost-control.ts \
-            adapters/claude-code/cost-control/README.md \
-            core/cost-control/*.ts \
-            core/logger.ts \
-            core/state-store.ts
+
+          stage dist/session-guard.zip \
+            adapters/opencode/session-guard/nexus-session-guard.ts opencode-nexus-session-guard.ts \
+            adapters/opencode/session-guard/README.md opencode-README.md \
+            adapters/claude-code/session-guard/nexus-session-guard.ts claude-code-nexus-session-guard.ts \
+            adapters/claude-code/session-guard/README.md claude-code-README.md \
+            core/logger.ts core-logger.ts \
+            core/state-store.ts core-state-store.ts \
+            core/session-guard/logic.ts core-session-guard-logic.ts
+
+          stage dist/headroom-intercept.zip \
+            adapters/opencode/headroom-intercept/nexus-headroom-intercept.ts opencode-nexus-headroom-intercept.ts \
+            adapters/opencode/headroom-intercept/README.md opencode-README.md \
+            adapters/claude-code/headroom-intercept/nexus-headroom-intercept.ts claude-code-nexus-headroom-intercept.ts \
+            adapters/claude-code/headroom-intercept/README.md claude-code-README.md \
+            core/headroom-intercept/compression.ts core-headroom-intercept-compression.ts \
+            core/headroom-intercept/config.ts core-headroom-intercept-config.ts \
+            core/headroom-intercept/engine.ts core-headroom-intercept-engine.ts \
+            core/headroom-intercept/policies.ts core-headroom-intercept-policies.ts \
+            core/headroom-intercept/store.ts core-headroom-intercept-store.ts \
+            core/headroom-intercept/structured-logger.ts core-headroom-intercept-structured-logger.ts \
+            core/headroom-intercept/types.ts core-headroom-intercept-types.ts
+
+          stage dist/compaction-plus.zip \
+            adapters/opencode/compaction-plus/nexus-compaction-plus.ts opencode-nexus-compaction-plus.ts \
+            adapters/opencode/compaction-plus/README.md opencode-README.md \
+            adapters/claude-code/compaction-plus/nexus-compaction-plus.ts claude-code-nexus-compaction-plus.ts \
+            adapters/claude-code/compaction-plus/README.md claude-code-README.md \
+            core/compaction-plus/api.ts core-compaction-plus-api.ts \
+            core/compaction-plus/config.ts core-compaction-plus-config.ts \
+            core/compaction-plus/state.ts core-compaction-plus-state.ts \
+            core/compaction-plus/types.ts core-compaction-plus-types.ts \
+            core/logger.ts core-logger.ts
+
+          stage dist/routing-guard.zip \
+            adapters/opencode/routing-guard/nexus-routing-guard.ts opencode-nexus-routing-guard.ts \
+            adapters/opencode/routing-guard/README.md opencode-README.md \
+            adapters/claude-code/routing-guard/nexus-routing-guard.ts claude-code-nexus-routing-guard.ts \
+            adapters/claude-code/routing-guard/README.md claude-code-README.md \
+            core/routing-guard/detect.ts core-routing-guard-detect.ts \
+            core/routing-guard/format.ts core-routing-guard-format.ts \
+            core/routing-guard/nexus-cli-catalog.ts core-routing-guard-nexus-cli-catalog.ts \
+            core/routing-guard/types.ts core-routing-guard-types.ts \
+            core/logger.ts core-logger.ts
+
+          stage dist/cost-control.zip \
+            adapters/opencode/cost-control/nexus-cost-control.ts opencode-nexus-cost-control.ts \
+            adapters/opencode/cost-control/README.md opencode-README.md \
+            adapters/claude-code/cost-control/nexus-cost-control.ts claude-code-nexus-cost-control.ts \
+            adapters/claude-code/cost-control/README.md claude-code-README.md \
+            core/cost-control/api.ts core-cost-control-api.ts \
+            core/cost-control/config.ts core-cost-control-config.ts \
+            core/cost-control/format.ts core-cost-control-format.ts \
+            core/cost-control/helicone.ts core-cost-control-helicone.ts \
+            core/cost-control/runtime-usage.ts core-cost-control-runtime-usage.ts \
+            core/cost-control/state.ts core-cost-control-state.ts \
+            core/cost-control/types.ts core-cost-control-types.ts \
+            core/logger.ts core-logger.ts \
+            core/state-store.ts core-state-store.ts
 
           # Combined bundle with all plugins
-          zip -j dist/nexus-runtime-plugins-all.zip \
-            adapters/opencode/session-guard/nexus-session-guard.ts \
-            adapters/claude-code/session-guard/nexus-session-guard.ts \
-            adapters/opencode/headroom-intercept/nexus-headroom-intercept.ts \
-            adapters/claude-code/headroom-intercept/nexus-headroom-intercept.ts \
-            adapters/opencode/compaction-plus/nexus-compaction-plus.ts \
-            adapters/claude-code/compaction-plus/nexus-compaction-plus.ts \
-            adapters/opencode/routing-guard/nexus-routing-guard.ts \
-            adapters/claude-code/routing-guard/nexus-routing-guard.ts \
-            adapters/opencode/cost-control/nexus-cost-control.ts \
-            adapters/claude-code/cost-control/nexus-cost-control.ts \
-            core/logger.ts \
-            core/state-store.ts \
-            core/session-guard/logic.ts \
-            core/headroom-intercept/*.ts \
-            core/compaction-plus/*.ts \
-            core/routing-guard/*.ts \
-            core/cost-control/*.ts
+          stage dist/nexus-runtime-plugins-all.zip \
+            adapters/opencode/session-guard/nexus-session-guard.ts opencode-session-guard-nexus-session-guard.ts \
+            adapters/claude-code/session-guard/nexus-session-guard.ts claude-code-session-guard-nexus-session-guard.ts \
+            adapters/opencode/headroom-intercept/nexus-headroom-intercept.ts opencode-headroom-intercept-nexus-headroom-intercept.ts \
+            adapters/claude-code/headroom-intercept/nexus-headroom-intercept.ts claude-code-headroom-intercept-nexus-headroom-intercept.ts \
+            adapters/opencode/compaction-plus/nexus-compaction-plus.ts opencode-compaction-plus-nexus-compaction-plus.ts \
+            adapters/claude-code/compaction-plus/nexus-compaction-plus.ts claude-code-compaction-plus-nexus-compaction-plus.ts \
+            adapters/opencode/routing-guard/nexus-routing-guard.ts opencode-routing-guard-nexus-routing-guard.ts \
+            adapters/claude-code/routing-guard/nexus-routing-guard.ts claude-code-routing-guard-nexus-routing-guard.ts \
+            adapters/opencode/cost-control/nexus-cost-control.ts opencode-cost-control-nexus-cost-control.ts \
+            adapters/claude-code/cost-control/nexus-cost-control.ts claude-code-cost-control-nexus-cost-control.ts \
+            core/logger.ts core-logger.ts \
+            core/state-store.ts core-state-store.ts \
+            core/session-guard/logic.ts core-session-guard-logic.ts \
+            core/headroom-intercept/compression.ts core-headroom-intercept-compression.ts \
+            core/headroom-intercept/config.ts core-headroom-intercept-config.ts \
+            core/headroom-intercept/engine.ts core-headroom-intercept-engine.ts \
+            core/headroom-intercept/policies.ts core-headroom-intercept-policies.ts \
+            core/headroom-intercept/store.ts core-headroom-intercept-store.ts \
+            core/headroom-intercept/structured-logger.ts core-headroom-intercept-structured-logger.ts \
+            core/headroom-intercept/types.ts core-headroom-intercept-types.ts \
+            core/compaction-plus/api.ts core-compaction-plus-api.ts \
+            core/compaction-plus/config.ts core-compaction-plus-config.ts \
+            core/compaction-plus/state.ts core-compaction-plus-state.ts \
+            core/compaction-plus/types.ts core-compaction-plus-types.ts \
+            core/routing-guard/detect.ts core-routing-guard-detect.ts \
+            core/routing-guard/format.ts core-routing-guard-format.ts \
+            core/routing-guard/nexus-cli-catalog.ts core-routing-guard-nexus-cli-catalog.ts \
+            core/routing-guard/types.ts core-routing-guard-types.ts \
+            core/cost-control/api.ts core-cost-control-api.ts \
+            core/cost-control/config.ts core-cost-control-config.ts \
+            core/cost-control/format.ts core-cost-control-format.ts \
+            core/cost-control/helicone.ts core-cost-control-helicone.ts \
+            core/cost-control/runtime-usage.ts core-cost-control-runtime-usage.ts \
+            core/cost-control/state.ts core-cost-control-state.ts \
+            core/cost-control/types.ts core-cost-control-types.ts
 
       - name: Upload artifacts (branch push)
         if: github.ref == 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')
