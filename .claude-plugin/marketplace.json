@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-marketplace.json",
+  "name": "gatewarden-nexus",
+  "owner": {
+    "name": "RELICFROG Consulting",
+    "url": "https://github.com/gwnexus"
+  },
+  "description": "Nexus platform integration for Claude Code: session tracking, context preservation across compaction, cost visibility, MCP output compression, and routing diagnostics.",
+  "plugins": [
+    {
+      "name": "nexus-core",
+      "source": "./plugins/nexus-core",
+      "description": "Nexus platform hooks, skills, and agents for Claude Code: session tracking (session-guard), compaction context preservation (compaction-plus), token cost visibility (cost-control), pre-injection MCP output compression (headroom-intercept), and model/agent routing diagnostics (routing-guard)."
+    }
+  ]
+}

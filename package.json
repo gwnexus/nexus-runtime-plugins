@@ -13,11 +13,14 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "fmt": "prettier --check \"**/*.ts\"",
-    "fmt:fix": "prettier --write \"**/*.ts\""
+    "fmt:fix": "prettier --write \"**/*.ts\"",
+    "build:nexus-core-plugin": "node scripts/build-nexus-core-plugin.mjs",
+    "verify:nexus-core-plugin": "node scripts/build-nexus-core-plugin.mjs --verify"
   },
   "devDependencies": {
     "@opencode-ai/plugin": "^1.14.0",
     "@types/node": "^22.0.0",
+    "esbuild": "^0.24.2",
     "typescript": "^5.8.0",
     "vitest": "^4.1.10"
   }

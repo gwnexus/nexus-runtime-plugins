@@ -30,6 +30,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Verify nexus-core plugin bundles are up to date
+        run: npm run verify:nexus-core-plugin
+
       - name: Read version from package.json
         id: version
         run: |

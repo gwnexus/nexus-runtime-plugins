@@ -34,6 +34,30 @@ auto-discovery mechanism (`.opencode/plugins/`). Migrated plugins (see
 | [**Routing Guard**](./adapters/opencode/routing-guard/README.md) | `v1.0.0` | Detects model routing divergence between Nexus config and the effective provider catalog (OpenCode + Claude Code adapters) |
 | [**Attribution Headers**](./600-attribution-headers/README.md) | `v1.0.0` | Injects session/actor attribution headers on outgoing requests to the Nexus gateway provider |
 
+## Claude Code plugin marketplace
+
+**`nexus-core` · [`plugins/nexus-core`](./plugins/nexus-core) · marketplace `gatewarden-nexus`**
+
+Per ADR-0117 (nexus-app, accepted), the five migrated plugins are also
+distributed as a single installable Claude Code plugin, `nexus-core`, via a
+`.claude-plugin/marketplace.json` at the repo root:
+
+```
+/plugin marketplace add gwnexus/nexus-runtime-plugins
+/plugin install nexus-core@gatewarden-nexus
+```
+
+`nexus-core` also ships six general-purpose skills (`adr-review`,
+`architecture-review`, `code-review`, `documentation-review`,
+`implementation-plan`, `test-ops`) and four agents (`architect`, `reviewer`,
+`security-reviewer`, `documentation-reviewer`). See
+[`plugins/nexus-core/README.md`](./plugins/nexus-core/README.md) for install
+options, the generated-bundle build step, and versioning/tagging
+conventions. This is an addition to, not a replacement for, the individual
+Claude Code adapters documented below -- installing them directly (copying
+the adapter `.ts` files) remains supported for anyone who doesn't want the
+full plugin/marketplace mechanism.
+
 ## Compaction Plus
 
 **`v1.8.1` · [`adapters/opencode/compaction-plus`](./adapters/opencode/compaction-plus) (OpenCode) · [`adapters/claude-code/compaction-plus`](./adapters/claude-code/compaction-plus) (Claude Code)**

@@ -64,7 +64,7 @@ Add to `.claude/settings.json`:
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "nexus_.*|headroom_.*",
+        "matcher": "nexus_.*|headroom_.*|mcp__nexus__.*|mcp__nexus-headroom__.*",
         "hooks": [
           {
             "type": "command",
@@ -82,10 +82,20 @@ Add to `.claude/settings.json`:
           }
         ]
       }
-    ]
-  }
-}
+     ]
+   }
+ }
 ```
+
+**Important (Fix §1, Dispatch `0e38cf7b`):** the `matcher` regex must include the
+`mcp__<server>__` prefix forms, not just `nexus_.*|headroom_.*`. Claude Code
+names MCP tools `mcp__<server>__<tool>` (for example `mcp__nexus__kb_memory`),
+so a matcher of only `nexus_.*|headroom_.*` never fires for real MCP tool
+calls and the hook is silently never invoked. `normalizeClaudeToolName()` in
+this adapter additionally normalizes the tool name to the core policy table's
+naming convention *after* the hook fires, but that only helps once the hook
+actually runs -- the matcher is the first (and easy to get wrong) gate.
+
 
 ## Configuration
 

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "nexus-core",
+  "displayName": "Nexus Core",
+  "version": "1.0.0",
+  "description": "Nexus platform hooks, skills, and agents for Claude Code.",
+  "author": {
+    "name": "RELICFROG Consulting",
+    "url": "https://github.com/gwnexus"
+  },
+  "homepage": "https://github.com/gwnexus/nexus-runtime-plugins",
+  "repository": "https://github.com/gwnexus/nexus-runtime-plugins",
+  "license": "UNLICENSED",
+  "keywords": ["nexus", "session-tracking", "cost-control", "compaction", "compression", "routing"],
+  "hooks": "./hooks/hooks.json"
+}
