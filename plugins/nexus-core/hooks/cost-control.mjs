@@ -32,10 +32,17 @@ function loadState(directory, fileName, fallback) {
     const path = join2(directory, ".nexus", fileName);
     if (!existsSync(path)) return fallback;
     const raw = readFileSync(path, "utf-8");
-    return { ...fallback, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    if (isPlainObject(fallback) && isPlainObject(parsed)) {
+      return { ...fallback, ...parsed };
+    }
+    return parsed;
   } catch {
     return fallback;
   }
+}
+function isPlainObject(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function saveState(directory, fileName, state) {
   try {

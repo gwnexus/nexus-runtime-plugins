@@ -17,7 +17,7 @@ vi.mock("../../../core/logger.ts", () => ({
   createFileLogger: () => vi.fn(),
 }))
 
-import { handleHookEvent } from "./nexus-session-guard.ts"
+import { handleHookEvent, normalizeClaudeToolName } from "./nexus-session-guard.ts"
 
 describe("session-guard Claude Code adapter", () => {
   const fileLog = vi.fn()
@@ -26,6 +26,37 @@ describe("session-guard Claude Code adapter", () => {
   beforeEach(() => {
     memory.clear()
     fileLog.mockClear()
+  })
+
+  describe("normalizeClaudeToolName", () => {
+    it("normalizes mcp__nexus__X to nexus_X", () => {
+      expect(normalizeClaudeToolName("mcp__nexus__task_create")).toBe("nexus_task_create")
+      expect(normalizeClaudeToolName("mcp__nexus__adr_create")).toBe("nexus_adr_create")
+      expect(normalizeClaudeToolName("mcp__nexus__session_append")).toBe("nexus_session_append")
+    })
+
+    it("leaves native tool names unchanged", () => {
+      expect(normalizeClaudeToolName("Edit")).toBe("Edit")
+      expect(normalizeClaudeToolName("Bash")).toBe("Bash")
+    })
+  })
+
+  it("post-tool-use recognizes mcp__nexus__session_append (Dispatch 0e38cf7b review)", () => {
+    handleHookEvent("user-prompt-submit", { cwd }, fileLog)
+    handleHookEvent("post-tool-use", { cwd, tool_name: "mcp__nexus__session_append" }, fileLog)
+
+    for (const _ of [1, 2, 3, 4]) {
+      const r = handleHookEvent("post-tool-use", { cwd, tool_name: "Edit" }, fileLog)
+      expect(r).toBeNull()
+    }
+  })
+
+  it("post-tool-use reminds for mcp__nexus__task_create at threshold", () => {
+    handleHookEvent("user-prompt-submit", { cwd }, fileLog)
+    handleHookEvent("post-tool-use", { cwd, tool_name: "mcp__nexus__task_create" }, fileLog)
+    handleHookEvent("post-tool-use", { cwd, tool_name: "mcp__nexus__task_create" }, fileLog)
+    const r3 = handleHookEvent("post-tool-use", { cwd, tool_name: "mcp__nexus__task_create" }, fileLog)
+    expect((r3 as any).hookSpecificOutput.additionalContext).toContain("[nexus-session-guard]")
   })
 
   it("user-prompt-submit increments the turn counter (no stdout payload)", () => {

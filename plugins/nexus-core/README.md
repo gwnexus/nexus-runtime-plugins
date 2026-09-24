@@ -21,7 +21,7 @@ Claude Code adapter.
 Or, for a specific pinned release:
 
 ```
-/plugin marketplace add gwnexus/nexus-runtime-plugins --ref nexus-core-v1.0.0
+/plugin marketplace add gwnexus/nexus-runtime-plugins --ref nexus-core--v1.0.0
 /plugin install nexus-core@gatewarden-nexus
 ```
 
@@ -87,11 +87,15 @@ the hook bundles.
 
 ## Versioning and releases
 
-Tag releases as `nexus-core-vX.Y.Z` (immutable, matching
-`plugin.json`'s `version` field) so users can pin
-`/plugin marketplace add ... --ref nexus-core-vX.Y.Z` to an exact release
-instead of tracking `main`. Record every user-visible change in
-`../../CHANGELOG.md` under the `nexus-core` heading.
+Use `claude plugin tag` (Claude Code 2.1.281+) to cut a release -- it creates
+a `{name}--v{version}` tag (`nexus-core--vX.Y.Z`, matching `plugin.json`'s
+`version` field) and validates `plugin.json` against the marketplace entry
+before tagging. Do not hand-create tags in a different format; nexus-app
+pins `extraKnownMarketplaces.gatewarden-nexus.source.ref` to this exact tag
+format. Users can pin an install to a specific release the same way:
+`/plugin marketplace add gwnexus/nexus-runtime-plugins --ref nexus-core--vX.Y.Z`.
+Record every user-visible change in `../../CHANGELOG.md` under the
+`nexus-core` heading before tagging.
 
 ## Known gaps (disclosed, not silently assumed away)
 

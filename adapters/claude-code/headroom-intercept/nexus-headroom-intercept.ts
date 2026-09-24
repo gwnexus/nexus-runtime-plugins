@@ -98,7 +98,7 @@ import type { PluginMode, SessionMetrics } from "../../../core/headroom-intercep
 import { wrapRetrievedContent } from "../../../core/headroom-intercept/compression.ts"
 import { intercept, commitTransformed, commitTransformFailed } from "../../../core/headroom-intercept/engine.ts"
 
-const PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.15" } as const
+const PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.16" } as const
 
 const DEFAULT_MODE: PluginMode = "observe"
 const DEBUG = process.env.HEADROOM_DEBUG === "true"

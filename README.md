@@ -29,8 +29,8 @@ auto-discovery mechanism (`.opencode/plugins/`). Migrated plugins (see
 | --- | --- | --- |
 | [**Compaction Plus**](./adapters/opencode/compaction-plus/README.md) | `v1.8.1` | Preserves Nexus session context across compaction events (OpenCode + Claude Code adapters) |
 | [**Cost Control**](./adapters/opencode/cost-control/README.md) | `v1.2.0` | Token usage and cost tracking via native runtime aggregation, with optional Helicone enrichment (OpenCode + Claude Code adapters) |
-| [**Headroom Intercept**](./adapters/opencode/headroom-intercept/README.md) | `v0.5.15` | Pre-injection context compression for Nexus MCP tool outputs (OpenCode + Claude Code adapters) |
-| [**Session Guard**](./adapters/opencode/session-guard/README.md) | `v1.1.2` | Enforces session append discipline after code-changing tool calls (OpenCode + Claude Code adapters) |
+| [**Headroom Intercept**](./adapters/opencode/headroom-intercept/README.md) | `v0.5.16` | Pre-injection context compression for Nexus MCP tool outputs (OpenCode + Claude Code adapters) |
+| [**Session Guard**](./adapters/opencode/session-guard/README.md) | `v1.1.3` | Enforces session append discipline after code-changing tool calls (OpenCode + Claude Code adapters) |
 | [**Routing Guard**](./adapters/opencode/routing-guard/README.md) | `v1.0.0` | Detects model routing divergence between Nexus config and the effective provider catalog (OpenCode + Claude Code adapters) |
 | [**Attribution Headers**](./600-attribution-headers/README.md) | `v1.0.0` | Injects session/actor attribution headers on outgoing requests to the Nexus gateway provider |
 
@@ -127,7 +127,7 @@ removing the Helicone dependency.
 
 ## Headroom Intercept
 
-**`v0.5.15` · [`adapters/opencode/headroom-intercept`](./adapters/opencode/headroom-intercept) (OpenCode) · [`adapters/claude-code/headroom-intercept`](./adapters/claude-code/headroom-intercept) (Claude Code)**
+**`v0.5.16` · [`adapters/opencode/headroom-intercept`](./adapters/opencode/headroom-intercept) (OpenCode) · [`adapters/claude-code/headroom-intercept`](./adapters/claude-code/headroom-intercept) (Claude Code)**
 
 > Migrated to the ADR-C05 `core/` + `adapters/` structure. All policy,
 > compression, cache, and credential-resolution logic lives in
@@ -166,7 +166,7 @@ and compression profile. Originals are retrievable via the plugin's own
 
 ## Session Guard
 
-**`v1.1.2` · [`adapters/opencode/session-guard`](./adapters/opencode/session-guard) (OpenCode) · [`adapters/claude-code/session-guard`](./adapters/claude-code/session-guard) (Claude Code)**
+**`v1.1.3` · [`adapters/opencode/session-guard`](./adapters/opencode/session-guard) (OpenCode) · [`adapters/claude-code/session-guard`](./adapters/claude-code/session-guard) (Claude Code)**
 
 > This plugin has been migrated to the ADR-C05 `core/` + `adapters/` structure
 > as the Track B2 pilot. Shared trigger-detection logic lives in

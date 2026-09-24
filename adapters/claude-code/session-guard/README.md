@@ -24,7 +24,7 @@ and is identical between the OpenCode and Claude Code adapters.
 | OpenCode | Claude Code | Notes |
 |----------|-------------|-------|
 | `event` (`message.updated`, role=user) | `UserPromptSubmit` | Fires once per user turn; a closer semantic match than OpenCode's per-message dedup, but not verified byte-identical in ordering. |
-| `tool.execute.after` | `PostToolUse` (matcher `Edit\|Write\|MultiEdit\|Bash\|nexus_task_create\|nexus_adr_create\|nexus_adr_decide\|nexus_session_append`) | Reminder is returned via `hookSpecificOutput.additionalContext` instead of mutating tool output in place. |
+| `tool.execute.after` | `PostToolUse` (matcher `Edit\|Write\|MultiEdit\|Bash\|nexus_task_create\|nexus_adr_create\|nexus_adr_decide\|nexus_session_append\|mcp__nexus__task_create\|mcp__nexus__adr_create\|mcp__nexus__adr_decide\|mcp__nexus__session_append`) | Reminder is returned via `hookSpecificOutput.additionalContext` instead of mutating tool output in place. |
 
 ## Installation
 
@@ -45,7 +45,7 @@ Add to `.claude/settings.json`:
     ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit|Bash|nexus_task_create|nexus_adr_create|nexus_adr_decide|nexus_session_append",
+        "matcher": "Edit|Write|MultiEdit|Bash|nexus_task_create|nexus_adr_create|nexus_adr_decide|nexus_session_append|mcp__nexus__task_create|mcp__nexus__adr_create|mcp__nexus__adr_decide|mcp__nexus__session_append",
         "hooks": [
           {
             "type": "command",
@@ -62,6 +62,14 @@ Add to `.claude/settings.json`:
 correct field for both `PostToolUse` and `UserPromptSubmit`, verified
 against the official Claude Code hooks reference. No changes needed for
 this adapter.
+
+**Fixed (Dispatch `0e38cf7b` review, 2026-09-24):** Claude Code sends Nexus
+MCP tool calls as `mcp__nexus__task_create`, `mcp__nexus__adr_create`, etc.,
+not the OpenCode-style `nexus_task_create` names this adapter's matcher and
+internal trigger checks originally expected -- the same tool-name-mismatch
+bug found and fixed in `headroom-intercept`. The `matcher` above now includes
+both forms, and `normalizeClaudeToolName()` maps the MCP-prefixed name to the
+core naming convention before it reaches `evaluateToolCompletion()`.
 
 ## Logs
 

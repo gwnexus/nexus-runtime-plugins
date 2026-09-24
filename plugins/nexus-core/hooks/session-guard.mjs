@@ -29,10 +29,17 @@ function loadState(directory, fileName, fallback) {
     const path = join2(directory, ".nexus", fileName);
     if (!existsSync(path)) return fallback;
     const raw = readFileSync(path, "utf-8");
-    return { ...fallback, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    if (isPlainObject(fallback) && isPlainObject(parsed)) {
+      return { ...fallback, ...parsed };
+    }
+    return parsed;
   } catch {
     return fallback;
   }
+}
+function isPlainObject(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function saveState(directory, fileName, state) {
   try {
@@ -46,7 +53,7 @@ function saveState(directory, fileName, state) {
 // core/session-guard/logic.ts
 var PLUGIN_META = {
   name: "nexus-session-guard",
-  version: "1.1.2",
+  version: "1.1.3",
   description: "Detects code-changing tool completions and reminds the agent to call nexus_session_append before proceeding."
 };
 var DEFAULT_TRIGGER_TOOLS = /* @__PURE__ */ new Set(["Edit", "Write", "MultiEdit"]);
@@ -120,6 +127,14 @@ function evaluateToolCompletion(state, toolName, input) {
 
 // adapters/claude-code/session-guard/nexus-session-guard.ts
 var STATE_FILE = "session-guard-state.json";
+function normalizeClaudeToolName(toolName) {
+  const mcpMatch = toolName.match(/^mcp__([^_]+(?:-[^_]+)*)__(.+)$/);
+  if (!mcpMatch) return toolName;
+  const [, server, rest] = mcpMatch;
+  if (server === "nexus-headroom") return rest;
+  if (server === "nexus") return `nexus_${rest}`;
+  return toolName;
+}
 function handleHookEvent(mode, input, fileLog) {
   const directory = input.cwd ?? process.cwd();
   const state = loadState(directory, STATE_FILE, initialState());
@@ -130,7 +145,7 @@ function handleHookEvent(mode, input, fileLog) {
     return null;
   }
   if (mode === "post-tool-use") {
-    const toolName = String(input.tool_name ?? "");
+    const toolName = normalizeClaudeToolName(String(input.tool_name ?? ""));
     const toolInput = input.tool_input ?? {};
     const result = evaluateToolCompletion(state, toolName, toolInput);
     saveState(directory, STATE_FILE, state);
@@ -185,5 +200,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 export {
   STATE_FILE,
-  handleHookEvent
+  handleHookEvent,
+  normalizeClaudeToolName
 };

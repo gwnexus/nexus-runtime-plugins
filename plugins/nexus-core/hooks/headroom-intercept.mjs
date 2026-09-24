@@ -9,10 +9,17 @@ function loadState(directory, fileName, fallback) {
     const path = join(directory, ".nexus", fileName);
     if (!existsSync(path)) return fallback;
     const raw = readFileSync(path, "utf-8");
-    return { ...fallback, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    if (isPlainObject(fallback) && isPlainObject(parsed)) {
+      return { ...fallback, ...parsed };
+    }
+    return parsed;
   } catch {
     return fallback;
   }
+}
+function isPlainObject(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function saveState(directory, fileName, state) {
   try {
@@ -1067,7 +1074,7 @@ function commitObserved(event, metrics, logger) {
 }
 
 // adapters/claude-code/headroom-intercept/nexus-headroom-intercept.ts
-var PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.15" };
+var PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.16" };
 var DEFAULT_MODE = "observe";
 var DEBUG = process.env.HEADROOM_DEBUG === "true";
 var GATE_STATE_FILE = "headroom-gate-state.json";

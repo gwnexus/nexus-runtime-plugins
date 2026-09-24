@@ -12,7 +12,7 @@
 
 export const PLUGIN_META = {
   name: "nexus-session-guard",
-  version: "1.1.2",
+  version: "1.1.3",
   description:
     "Detects code-changing tool completions and reminds the agent to call nexus_session_append before proceeding.",
 } as const

@@ -13,7 +13,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit|Bash|nexus_task_create|nexus_adr_create|nexus_adr_decide|nexus_session_append",
+        "matcher": "Edit|Write|MultiEdit|Bash|nexus_task_create|nexus_adr_create|nexus_adr_decide|nexus_session_append|mcp__nexus__task_create|mcp__nexus__adr_create|mcp__nexus__adr_decide|mcp__nexus__session_append",
         "hooks": [
           {
             "type": "command",

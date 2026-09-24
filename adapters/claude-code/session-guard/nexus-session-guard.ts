@@ -22,6 +22,17 @@
  * entirely (used by headroom-intercept instead). No changes needed; this
  * adapter's approach matches the documented pattern as originally written.
  *
+ * Fix (Dispatch 0e38cf7b review, 2026-09-24): Claude Code sends Nexus MCP
+ * tool calls as `mcp__nexus__task_create`, `mcp__nexus__adr_create`, etc.,
+ * not the OpenCode-style `nexus_task_create` this adapter's `PostToolUse`
+ * matcher and `isTriggerTool()`/`DEFAULT_TRIGGER_MCP` check expect (same
+ * root cause as the headroom-intercept tool-name-mismatch bug fixed
+ * earlier in this dispatch). The matcher never fired for these tool names
+ * at all, so session-guard never saw or reminded about them. Fixed with
+ * the same `normalizeClaudeToolName()` approach used in the Claude Code
+ * headroom-intercept adapter (kept local to this adapter; core stays
+ * runtime-neutral).
+ *
  * Hook configuration (.claude/settings.json):
  *
  *   {
@@ -31,7 +42,7 @@
  *       ],
  *       "PostToolUse": [
  *         {
- *           "matcher": "Edit|Write|MultiEdit|Bash|nexus_task_create|nexus_adr_create|nexus_adr_decide|nexus_session_append",
+ *           "matcher": "Edit|Write|MultiEdit|Bash|nexus_task_create|nexus_adr_create|nexus_adr_decide|nexus_session_append|mcp__nexus__task_create|mcp__nexus__adr_create|mcp__nexus__adr_decide|mcp__nexus__session_append",
  *           "hooks": [{ "type": "command", "command": "node adapters/claude-code/session-guard/nexus-session-guard.ts post-tool-use" }]
  *         }
  *       ]
@@ -62,6 +73,21 @@ export interface ClaudeHookInput {
 export type HookMode = "user-prompt-submit" | "post-tool-use"
 
 /**
+ * Normalize Claude Code's MCP tool name into the core logic's naming
+ * convention (same mapping as the headroom-intercept adapter's
+ * `normalizeClaudeToolName`, Dispatch 0e38cf7b): `mcp__nexus__X` -> `nexus_X`.
+ * Native tools (`Edit`, `Write`, `Bash`, ...) pass through unchanged.
+ */
+export function normalizeClaudeToolName(toolName: string): string {
+  const mcpMatch = toolName.match(/^mcp__([^_]+(?:-[^_]+)*)__(.+)$/)
+  if (!mcpMatch) return toolName
+  const [, server, rest] = mcpMatch
+  if (server === "nexus-headroom") return rest
+  if (server === "nexus") return `nexus_${rest}`
+  return toolName
+}
+
+/**
  * Pure(ish) hook handler — testable without spawning a process. Reads
  * persisted state, applies the core logic, persists updated state, and
  * returns the JSON payload (if any) that should be written to stdout.
@@ -82,7 +108,7 @@ export function handleHookEvent(
   }
 
   if (mode === "post-tool-use") {
-    const toolName = String(input.tool_name ?? "")
+    const toolName = normalizeClaudeToolName(String(input.tool_name ?? ""))
     const toolInput = input.tool_input ?? {}
     const result = evaluateToolCompletion(state, toolName, toolInput)
     saveState(directory, STATE_FILE, state)
