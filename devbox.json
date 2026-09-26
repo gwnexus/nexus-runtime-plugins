@@ -3,16 +3,16 @@
     "NODE_ENV": "development",
     "HEADROOM_MODE": "transform",
     "HEADROOM_DEBUG": "false",
-    "NEXT_TELEMETRY_DISABLED": "1",
-    "HEADROOM_REQUIRE_PREFLIGHT": "true",
-    "POWERLEVEL9K_INSTANT_PROMPT": "quiet",
-    "HEADROOM_RETRIEVAL_MAX_CHARS": "24000",
-    "HEADROOM_RETRIEVAL_MAX_LINES": "200",
-    "HEADROOM_ALLOW_FULL_RETRIEVAL": "false",
     "C_DBX_META_TEAM": "NEXUS-Labs",
     "C_DBX_META_TEAM_ID": "NEXUS-Labs-DD",
     "C_DBX_META_PROJECT_ID": "NEXUS-OC-PLUGINS",
-    "C_DBX_META_TEAM_DESCRIPTION": "Nexus SaaS Development Team"
+    "NEXT_TELEMETRY_DISABLED": "1",
+    "HEADROOM_REQUIRE_PREFLIGHT": "true",
+    "C_DBX_META_TEAM_DESCRIPTION": "Nexus SaaS Development Team",
+    "POWERLEVEL9K_INSTANT_PROMPT": "quiet",
+    "HEADROOM_RETRIEVAL_MAX_CHARS": "24000",
+    "HEADROOM_RETRIEVAL_MAX_LINES": "200",
+    "HEADROOM_ALLOW_FULL_RETRIEVAL": "false"
   },
   "shell": {
     "scripts": {
@@ -46,6 +46,8 @@
     "glow": "1.5.1",
     "tmux": "3.4",
     "tmuxp": "1.47.0",
+    "zellij": "0.45.0",
+    "ccusage": "20.0.17",
     "lazygit": "0.43.1",
     "ripgrep": "14.1.0",
     "gitleaks": "latest",
