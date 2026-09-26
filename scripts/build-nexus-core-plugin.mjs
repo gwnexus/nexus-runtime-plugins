@@ -4,7 +4,7 @@
  * nexus-app, Dispatch 0e38cf7b Part 2).
  *
  * Plugins install via git, and TypeScript source is not directly executable
- * by Claude Code's `command`-type hooks, so each of the five Claude Code
+ * by Claude Code's `command`-type hooks, so each Claude Code
  * adapters is bundled here into a single-file ESM `.mjs` script under
  * `plugins/nexus-core/hooks/`. These bundles are committed to the repo (not
  * gitignored) so a git-sourced marketplace install works with no build step
@@ -36,6 +36,7 @@ const ADAPTERS = {
   "compaction-plus": "adapters/claude-code/compaction-plus/nexus-compaction-plus.ts",
   "routing-guard": "adapters/claude-code/routing-guard/nexus-routing-guard.ts",
   "cost-control": "adapters/claude-code/cost-control/nexus-cost-control.ts",
+  "agent-observer": "adapters/claude-code/agent-observer/nexus-agent-observer.ts",
 }
 
 const verify = process.argv.includes("--verify")

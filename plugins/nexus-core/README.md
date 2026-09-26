@@ -1,10 +1,10 @@
 # nexus-core (Claude Code plugin)
 
-**Marketplace:** `gatewarden-nexus` · **Plugin:** `nexus-core` · **Version:** `1.0.0`
+**Marketplace:** `gatewarden-nexus` · **Plugin:** `nexus-core` · **Version:** `1.1.0`
 
-The Claude Code distribution of this repo's five in-scope runtime plugins
+The Claude Code distribution of this repo's runtime plugins
 (`session-guard`, `headroom-intercept`, `compaction-plus`, `routing-guard`,
-`cost-control`), packaged as a single installable Claude Code plugin per
+`cost-control`, and the Claude Code-only `agent-observer`), packaged as a single installable Claude Code plugin per
 ADR-0117 (nexus-app, accepted), plus a starter set of skills and agents for
 architecture/code/security/documentation review and implementation planning.
 
@@ -36,12 +36,15 @@ full resolution order) before enabling the plugin.
 plugins/nexus-core/
 ├── .claude-plugin/plugin.json   # plugin manifest
 ├── hooks/
-│   ├── hooks.json                # event wiring for all 5 adapters
+│   ├── hooks.json                # event wiring for all 6 adapters
 │   ├── session-guard.mjs         # GENERATED -- do not edit directly
 │   ├── headroom-intercept.mjs    # GENERATED -- do not edit directly
 │   ├── compaction-plus.mjs       # GENERATED -- do not edit directly
 │   ├── routing-guard.mjs         # GENERATED -- do not edit directly
-│   └── cost-control.mjs          # GENERATED -- do not edit directly
+│   ├── cost-control.mjs          # GENERATED -- do not edit directly
+│   └── agent-observer.mjs        # GENERATED -- do not edit directly
+├── schemas/
+│   └── nexus.agent-observation.v1.schema.json   # record schema of observer/events.jsonl
 ├── skills/
 │   ├── adr-review/
 │   ├── architecture-review/
@@ -73,6 +76,17 @@ npm run build:nexus-core-plugin
 
 CI fails the build (`npm run verify:nexus-core-plugin`) if the committed
 bundles have drifted from source.
+
+## Agent observer (ADR-0120)
+
+`agent-observer` writes one `nexus.agent-observation.v1` line per hook event
+to `.nexus/claude/observer/events.jsonl` for `nexus status --agents`. It is
+registered on `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`,
+`PostToolUseFailure` (matcher `*` for the tool events), `Notification`,
+`SubagentStart`, `SubagentStop`, `Stop`, `StopFailure` and `SessionEnd`.
+Consumers validate against `schemas/nexus.agent-observation.v1.schema.json`.
+See `adapters/claude-code/agent-observer/README.md` for the derivation rules,
+guarantees and known gaps.
 
 ## Skills and agents
 

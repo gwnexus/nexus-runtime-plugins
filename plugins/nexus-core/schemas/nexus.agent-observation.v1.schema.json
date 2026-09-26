@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/gwnexus/nexus-runtime-plugins/plugins/nexus-core/schemas/nexus.agent-observation.v1.schema.json",
+  "title": "nexus.agent-observation.v1",
+  "description": "One line of <agentic_root>/claude/observer/events.jsonl, written by the nexus-agent-observer Claude Code hook adapter (ADR-0120). One record per hook event. Values that are not available are null. Never contains tool inputs/outputs, prompt text beyond the 120-char task summary, env values or secrets.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "ts",
+    "event",
+    "sessionId",
+    "agentId",
+    "parentAgentId",
+    "role",
+    "state",
+    "task",
+    "tool",
+    "toolUseId",
+    "model",
+    "repository",
+    "cwd",
+    "worktree",
+    "startedAt",
+    "runtimeMs",
+    "inputTokens",
+    "outputTokens"
+  ],
+  "properties": {
+    "schema": {
+      "const": "nexus.agent-observation.v1"
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Time the hook fired (ISO 8601, UTC)."
+    },
+    "event": {
+      "type": "string",
+      "description": "Claude Code hook event name as received (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, Notification, SubagentStart, SubagentStop, Stop, StopFailure, SessionEnd, ...)."
+    },
+    "sessionId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "agentId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Main agent: the session id. Subagent: the Claude Code agent_id. Background shell: the tool_use_id of the Bash call that started it."
+    },
+    "parentAgentId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "null for the main agent; the spawning agent's agentId for subagents and background shells."
+    },
+    "role": {
+      "enum": [
+        "main",
+        "subagent",
+        "background"
+      ]
+    },
+    "state": {
+      "enum": [
+        "working",
+        "waiting",
+        "done",
+        "failed",
+        "unknown"
+      ],
+      "description": "working: UserPromptSubmit / PreToolUse / PostToolUse(Failure) of the agent itself, and SubagentStart; waiting: Notification; done: Stop, SubagentStop, SessionEnd, or a completed <task-notification>; failed: StopFailure, a failed/killed <task-notification>, or PostToolUseFailure of a background Bash launch; unknown otherwise (e.g. SessionStart)."
+    },
+    "task": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 120,
+      "description": "Subagent description / background shell description, or a prompt summary for the main agent; single line, truncated to 120 chars."
+    },
+    "tool": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Tool name only (never its input or output)."
+    },
+    "toolUseId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "tool_use_id of the tool event; lets consumers link a Task/Agent tool call to the subagent it spawned."
+    },
+    "model": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "repository": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Basename of the git top-level directory."
+    },
+    "cwd": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "worktree": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Worktree path when cwd is inside a linked git worktree that differs from the main repository root; otherwise null."
+    },
+    "startedAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "description": "When this agent was first observed."
+    },
+    "runtimeMs": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "ts - startedAt, in milliseconds."
+    },
+    "inputTokens": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Cumulative input tokens for this agent (input + cache creation + cache read), read incrementally from the documented transcript_path / agent_transcript_path on Stop/SubagentStop; later records repeat the last measured value. null until first measured."
+    },
+    "outputTokens": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Cumulative output tokens for this agent; same source and cadence as inputTokens."
+    }
+  }
+}

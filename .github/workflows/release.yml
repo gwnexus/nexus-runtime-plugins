@@ -132,6 +132,20 @@ jobs:
             core/logger.ts core-logger.ts \
             core/state-store.ts core-state-store.ts
 
+          # Claude Code-only adapter (ADR-0120): no OpenCode counterpart. Ships
+          # the built single-file bundle too, for claude_hook_adapters.
+          stage dist/agent-observer.zip \
+            adapters/claude-code/agent-observer/nexus-agent-observer.ts claude-code-nexus-agent-observer.ts \
+            adapters/claude-code/agent-observer/README.md claude-code-README.md \
+            plugins/nexus-core/hooks/agent-observer.mjs nexus-agent-observer.mjs \
+            plugins/nexus-core/schemas/nexus.agent-observation.v1.schema.json nexus.agent-observation.v1.schema.json \
+            core/agent-observer/git.ts core-agent-observer-git.ts \
+            core/agent-observer/mapping.ts core-agent-observer-mapping.ts \
+            core/agent-observer/state.ts core-agent-observer-state.ts \
+            core/agent-observer/transcript.ts core-agent-observer-transcript.ts \
+            core/agent-observer/types.ts core-agent-observer-types.ts \
+            core/agent-observer/writer.ts core-agent-observer-writer.ts
+
           # Combined bundle with all plugins
           stage dist/nexus-runtime-plugins-all.zip \
             adapters/opencode/session-guard/nexus-session-guard.ts opencode-session-guard-nexus-session-guard.ts \
@@ -144,6 +158,7 @@ jobs:
             adapters/claude-code/routing-guard/nexus-routing-guard.ts claude-code-routing-guard-nexus-routing-guard.ts \
             adapters/opencode/cost-control/nexus-cost-control.ts opencode-cost-control-nexus-cost-control.ts \
             adapters/claude-code/cost-control/nexus-cost-control.ts claude-code-cost-control-nexus-cost-control.ts \
+            adapters/claude-code/agent-observer/nexus-agent-observer.ts claude-code-agent-observer-nexus-agent-observer.ts \
             core/logger.ts core-logger.ts \
             core/state-store.ts core-state-store.ts \
             core/session-guard/logic.ts core-session-guard-logic.ts \
@@ -168,7 +183,13 @@ jobs:
             core/cost-control/helicone.ts core-cost-control-helicone.ts \
             core/cost-control/runtime-usage.ts core-cost-control-runtime-usage.ts \
             core/cost-control/state.ts core-cost-control-state.ts \
-            core/cost-control/types.ts core-cost-control-types.ts
+            core/cost-control/types.ts core-cost-control-types.ts \
+            core/agent-observer/git.ts core-agent-observer-git.ts \
+            core/agent-observer/mapping.ts core-agent-observer-mapping.ts \
+            core/agent-observer/state.ts core-agent-observer-state.ts \
+            core/agent-observer/transcript.ts core-agent-observer-transcript.ts \
+            core/agent-observer/types.ts core-agent-observer-types.ts \
+            core/agent-observer/writer.ts core-agent-observer-writer.ts
 
       - name: Upload artifacts (branch push)
         if: github.ref == 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')
@@ -191,4 +212,5 @@ jobs:
             dist/compaction-plus.zip
             dist/routing-guard.zip
             dist/cost-control.zip
+            dist/agent-observer.zip
             dist/nexus-runtime-plugins-all.zip
