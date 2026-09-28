@@ -58,8 +58,9 @@ import { queryHeliconeSession } from "../../../core/cost-control/helicone.ts"
 import { appendCostEntry } from "../../../core/cost-control/api.ts"
 import { emptyRuntimeUsage, buildRuntimeCostEntry, type RuntimeUsage } from "../../../core/cost-control/runtime-usage.ts"
 import type { NormalizedToolCall } from "../../../core/cost-control/types.ts"
+import { resolveProjectRoot } from "../../../core/project-root.ts"
 
-const PLUGIN_META = { name: "nexus-cost-control", version: "1.2.0" } as const
+const PLUGIN_META = { name: "nexus-cost-control", version: "1.2.1" } as const
 const STATE_FILE = "cost-control-state.json"
 
 interface CostControlState {
@@ -274,7 +275,11 @@ async function main(): Promise<void> {
     process.exit(0)
   }
 
-  const directory = input.cwd ?? process.cwd()
+  // Anchor every .nexus/ read and write at the project root, not the session's
+  // current cwd (Dispatch b7d15add); skip entirely when no root resolves.
+  const directory = resolveProjectRoot(input.cwd)
+  if (!directory) process.exit(0)
+  input = { ...input, cwd: directory }
   const fileLog = createFileLogger(directory, "cost-control.log")
   const logger = (level: string, message: string) => fileLog(level, message)
 

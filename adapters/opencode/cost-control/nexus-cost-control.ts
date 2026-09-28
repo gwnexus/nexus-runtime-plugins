@@ -28,7 +28,7 @@ import type { NormalizedToolCall } from "../../../core/cost-control/types.ts"
  */
 const PLUGIN_META = {
   name: "nexus-cost-control",
-  version: "1.2.0",
+  version: "1.2.1",
   description:
     "Token usage and cost tracking for Nexus sessions. Aggregates token " +
     "counts directly from the runtime's own message data with zero " +

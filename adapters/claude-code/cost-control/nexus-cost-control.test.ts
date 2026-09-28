@@ -142,7 +142,7 @@ describe("cost-control Claude Code adapter", () => {
         nexusConfig,
         "s1",
         expect.objectContaining({ costUsd: null, costSource: "runtime", totalTokens: 390 }),
-        { name: "nexus-cost-control", version: "1.2.0" },
+        { name: "nexus-cost-control", version: "1.2.1" },
         expect.any(Function),
       )
     })
@@ -182,7 +182,7 @@ describe("cost-control Claude Code adapter", () => {
         nexusConfig,
         "s1",
         expect.objectContaining({ totalTokens: 150 }),
-        { name: "nexus-cost-control", version: "1.2.0" },
+        { name: "nexus-cost-control", version: "1.2.1" },
         expect.any(Function),
       )
     })
@@ -263,7 +263,7 @@ describe("cost-control Claude Code adapter", () => {
           totalMessages: 1,
           models: ["claude-opus-4"],
         }),
-        { name: "nexus-cost-control", version: "1.2.0" },
+        { name: "nexus-cost-control", version: "1.2.1" },
         expect.any(Function),
       )
     })

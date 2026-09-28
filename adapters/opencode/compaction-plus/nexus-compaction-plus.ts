@@ -18,7 +18,7 @@ import type { NormalizedToolCall } from "../../../core/compaction-plus/types.ts"
  */
 const PLUGIN_META = {
   name: "nexus-compaction-plus",
-  version: "1.8.1",
+  version: "1.8.2",
   description:
     "Preserves Nexus session context across compaction and records compaction events in the active session.",
 } as const

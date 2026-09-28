@@ -31,6 +31,7 @@ import { existsSync } from "node:fs"
 import { isAbsolute, join, resolve } from "node:path"
 import { observe, type ObserveContext } from "../../../core/agent-observer/mapping.ts"
 import { resolveRepoInfo } from "../../../core/agent-observer/git.ts"
+import { resolveProjectRoot } from "../../../core/project-root.ts"
 import { readUsageIncrement } from "../../../core/agent-observer/transcript.ts"
 import { loadObserverState, saveObserverState, withObserverLock } from "../../../core/agent-observer/state.ts"
 import { appendRecords } from "../../../core/agent-observer/writer.ts"
@@ -41,8 +42,10 @@ import { PLUGIN_META, type ObserverHookInput } from "../../../core/agent-observe
  * `<project>/.nexus`; `NEXUS_AGENTIC_ROOT` (absolute, or relative to the
  * project dir) overrides it.
  */
-export function resolveObserverDir(env: NodeJS.ProcessEnv, input: ObserverHookInput): string {
-  const projectDir = env.CLAUDE_PROJECT_DIR || (typeof input.cwd === "string" ? input.cwd : "") || process.cwd()
+export function resolveObserverDir(env: NodeJS.ProcessEnv, input: ObserverHookInput): string | null {
+  // Project root, never the session's current cwd (Dispatch b7d15add).
+  const projectDir = resolveProjectRoot(typeof input.cwd === "string" ? input.cwd : null, env)
+  if (!projectDir) return null
   const override = env.NEXUS_AGENTIC_ROOT
   const root = override ? (isAbsolute(override) ? override : resolve(projectDir, override)) : join(projectDir, ".nexus")
   return join(root, "claude", "observer")
@@ -55,6 +58,7 @@ export function handleHookPayload(
   now: Date = new Date(),
 ): boolean {
   const observerDir = resolveObserverDir(env, input)
+  if (!observerDir) return false
   const agenticRoot = resolve(observerDir, "..", "..")
   if (!existsSync(agenticRoot)) return false
 

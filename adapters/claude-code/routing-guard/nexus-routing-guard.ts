@@ -65,8 +65,9 @@ import {
 } from "../../../core/routing-guard/nexus-cli-catalog.ts"
 import type { RoutingCatalogFile, AgentRoutingFile } from "../../../core/routing-guard/nexus-cli-catalog.ts"
 import type { AgentInfo, ProviderCatalog } from "../../../core/routing-guard/types.ts"
+import { resolveProjectRoot } from "../../../core/project-root.ts"
 
-const PLUGIN_META = { name: "nexus-routing-guard", version: "1.0.0" } as const
+const PLUGIN_META = { name: "nexus-routing-guard", version: "1.0.1" } as const
 const ENV_ENABLED = "NEXUS_ROUTING_GUARD_ENABLED"
 const ENV_CATALOG_PATH = "NEXUS_ROUTING_GUARD_CATALOG_PATH"
 const ENV_AGENTS_PATH = "NEXUS_ROUTING_GUARD_AGENTS_PATH"
@@ -182,7 +183,11 @@ async function main(): Promise<void> {
     process.exit(0)
   }
 
-  const directory = input.cwd ?? process.cwd()
+  // Anchor every .nexus/ read and write at the project root, not the session's
+  // current cwd (Dispatch b7d15add); skip entirely when no root resolves.
+  const directory = resolveProjectRoot(input.cwd)
+  if (!directory) process.exit(0)
+  input = { ...input, cwd: directory }
   const fileLog = createFileLogger(directory, "routing-guard.log")
   const logger = (level: string, message: string) => fileLog(level, message)
 

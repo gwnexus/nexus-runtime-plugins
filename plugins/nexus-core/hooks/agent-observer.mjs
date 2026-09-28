@@ -3,12 +3,12 @@
 
 // adapters/claude-code/agent-observer/nexus-agent-observer.ts
 import { existsSync } from "node:fs";
-import { isAbsolute as isAbsolute2, join as join3, resolve as resolve2 } from "node:path";
+import { isAbsolute as isAbsolute2, join as join3, resolve as resolve3 } from "node:path";
 
 // core/agent-observer/types.ts
 var PLUGIN_META = {
   name: "nexus-agent-observer",
-  version: "1.0.0",
+  version: "1.0.1",
   description: "Writes nexus.agent-observation.v1 events from Claude Code hooks for the Agent Observability pane."
 };
 var OBSERVATION_SCHEMA = "nexus.agent-observation.v1";
@@ -318,6 +318,33 @@ function fromGitFile(topLevel, gitFile) {
   return { repository: basename(topLevel), worktree: null };
 }
 
+// core/project-root.ts
+import { statSync as statSync2 } from "node:fs";
+import { dirname as dirname2, resolve as resolve2 } from "node:path";
+function resolveProjectRoot(cwd, env = process.env) {
+  const projectDir = env.CLAUDE_PROJECT_DIR?.trim();
+  if (projectDir) return resolve2(projectDir);
+  return findGitTopLevel(cwd ?? process.cwd());
+}
+function findGitTopLevel(start) {
+  let dir = resolve2(start);
+  for (let i = 0; i < 64; i++) {
+    if (hasGitEntry(dir)) return dir;
+    const parent = dirname2(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+  return null;
+}
+function hasGitEntry(dir) {
+  try {
+    const st = statSync2(resolve2(dir, ".git"));
+    return st.isDirectory() || st.isFile();
+  } catch {
+    return false;
+  }
+}
+
 // core/agent-observer/transcript.ts
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
 var MAX_READ_BYTES = 16 * 1024 * 1024;
@@ -392,7 +419,7 @@ function num(v) {
 }
 
 // core/agent-observer/state.ts
-import { closeSync as closeSync2, mkdirSync, openSync as openSync2, readFileSync as readFileSync2, renameSync, statSync as statSync2, unlinkSync, writeFileSync } from "node:fs";
+import { closeSync as closeSync2, mkdirSync, openSync as openSync2, readFileSync as readFileSync2, renameSync, statSync as statSync3, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 var STATE_FILE = "state.json";
 var STATE_TTL_MS = 24 * 60 * 60 * 1e3;
@@ -439,7 +466,7 @@ function withObserverLock(observerDir, fn) {
 }
 function isStale(lockPath) {
   try {
-    return Date.now() - statSync2(lockPath).mtimeMs > LOCK_STALE_MS;
+    return Date.now() - statSync3(lockPath).mtimeMs > LOCK_STALE_MS;
   } catch {
     return false;
   }
@@ -485,7 +512,7 @@ function isObj(v) {
 }
 
 // core/agent-observer/writer.ts
-import { appendFileSync, mkdirSync as mkdirSync2, renameSync as renameSync2, statSync as statSync3 } from "node:fs";
+import { appendFileSync, mkdirSync as mkdirSync2, renameSync as renameSync2, statSync as statSync4 } from "node:fs";
 import { join as join2 } from "node:path";
 var EVENTS_FILE = "events.jsonl";
 var ROTATED_FILE = "events.1.jsonl";
@@ -506,7 +533,7 @@ function appendRecords(observerDir, records, maxBytes = DEFAULT_MAX_BYTES) {
 function rotateIfNeeded(observerDir, path, maxBytes) {
   let size;
   try {
-    size = statSync3(path).size;
+    size = statSync4(path).size;
   } catch {
     return;
   }
@@ -516,14 +543,16 @@ function rotateIfNeeded(observerDir, path, maxBytes) {
 
 // adapters/claude-code/agent-observer/nexus-agent-observer.ts
 function resolveObserverDir(env, input) {
-  const projectDir = env.CLAUDE_PROJECT_DIR || (typeof input.cwd === "string" ? input.cwd : "") || process.cwd();
+  const projectDir = resolveProjectRoot(typeof input.cwd === "string" ? input.cwd : null, env);
+  if (!projectDir) return null;
   const override = env.NEXUS_AGENTIC_ROOT;
-  const root = override ? isAbsolute2(override) ? override : resolve2(projectDir, override) : join3(projectDir, ".nexus");
+  const root = override ? isAbsolute2(override) ? override : resolve3(projectDir, override) : join3(projectDir, ".nexus");
   return join3(root, "claude", "observer");
 }
 function handleHookPayload(input, env = process.env, now = /* @__PURE__ */ new Date()) {
   const observerDir = resolveObserverDir(env, input);
-  const agenticRoot = resolve2(observerDir, "..", "..");
+  if (!observerDir) return false;
+  const agenticRoot = resolve3(observerDir, "..", "..");
   if (!existsSync(agenticRoot)) return false;
   const repo = resolveRepoInfo(typeof input.cwd === "string" ? input.cwd : null);
   return withObserverLock(observerDir, () => {

@@ -59,6 +59,7 @@ import {
   REMINDER_MESSAGE,
   type SessionGuardState,
 } from "../../../core/session-guard/logic.ts"
+import { resolveProjectRoot } from "../../../core/project-root.ts"
 
 export const STATE_FILE = "session-guard-state.json"
 
@@ -157,7 +158,11 @@ async function main(): Promise<void> {
     process.exit(0)
   }
 
-  const directory = input.cwd ?? process.cwd()
+  // Anchor every .nexus/ read and write at the project root, not the session's
+  // current cwd (Dispatch b7d15add); skip entirely when no root resolves.
+  const directory = resolveProjectRoot(input.cwd)
+  if (!directory) process.exit(0)
+  input = { ...input, cwd: directory }
   const fileLog = createFileLogger(directory, "session-guard.log")
   const output = handleHookEvent(mode, input, fileLog)
 

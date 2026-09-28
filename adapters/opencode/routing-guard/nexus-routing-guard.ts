@@ -21,7 +21,7 @@ export { detectRoutingWarnings }
 
 const PLUGIN_META = {
   name: "nexus-routing-guard",
-  version: "1.0.0",
+  version: "1.0.1",
   description:
     "Detects model routing divergence between Nexus-configured agents and the effective merged OpenCode provider/model catalog, and surfaces a one-shot warning.",
 } as const

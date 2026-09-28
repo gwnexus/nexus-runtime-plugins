@@ -97,8 +97,9 @@ import { initialMetrics } from "../../../core/headroom-intercept/types.ts"
 import type { PluginMode, SessionMetrics } from "../../../core/headroom-intercept/types.ts"
 import { wrapRetrievedContent } from "../../../core/headroom-intercept/compression.ts"
 import { intercept, commitTransformed, commitTransformFailed } from "../../../core/headroom-intercept/engine.ts"
+import { resolveProjectRoot } from "../../../core/project-root.ts"
 
-const PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.17" } as const
+const PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.18" } as const
 
 const DEFAULT_MODE: PluginMode = "observe"
 const DEBUG = process.env.HEADROOM_DEBUG === "true"
@@ -420,7 +421,11 @@ async function main(): Promise<void> {
     process.exit(0)
   }
 
-  const directory = input.cwd ?? process.cwd()
+  // Anchor every .nexus/ read and write at the project root, not the session's
+  // current cwd (Dispatch b7d15add); skip entirely when no root resolves.
+  const directory = resolveProjectRoot(input.cwd)
+  if (!directory) process.exit(0)
+  input = { ...input, cwd: directory }
   const logger = new StructuredLogger(directory, PLUGIN_META.name, PLUGIN_META.version, DEBUG)
 
   if (mode === "post-tool-use") {

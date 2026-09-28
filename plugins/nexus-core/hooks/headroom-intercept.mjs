@@ -1073,8 +1073,35 @@ function commitObserved(event, metrics, logger) {
   metrics.events.push(event);
 }
 
+// core/project-root.ts
+import { statSync as statSync3 } from "node:fs";
+import { dirname, resolve } from "node:path";
+function resolveProjectRoot(cwd, env = process.env) {
+  const projectDir = env.CLAUDE_PROJECT_DIR?.trim();
+  if (projectDir) return resolve(projectDir);
+  return findGitTopLevel(cwd ?? process.cwd());
+}
+function findGitTopLevel(start) {
+  let dir = resolve(start);
+  for (let i = 0; i < 64; i++) {
+    if (hasGitEntry(dir)) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+  return null;
+}
+function hasGitEntry(dir) {
+  try {
+    const st = statSync3(resolve(dir, ".git"));
+    return st.isDirectory() || st.isFile();
+  } catch {
+    return false;
+  }
+}
+
 // adapters/claude-code/headroom-intercept/nexus-headroom-intercept.ts
-var PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.17" };
+var PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.18" };
 var DEFAULT_MODE = "observe";
 var DEBUG = process.env.HEADROOM_DEBUG === "true";
 var GATE_STATE_FILE = "headroom-gate-state.json";
@@ -1294,7 +1321,9 @@ async function main() {
   } catch {
     process.exit(0);
   }
-  const directory = input.cwd ?? process.cwd();
+  const directory = resolveProjectRoot(input.cwd);
+  if (!directory) process.exit(0);
+  input = { ...input, cwd: directory };
   const logger = new StructuredLogger(directory, PLUGIN_META.name, PLUGIN_META.version, DEBUG);
   if (mode === "post-tool-use") {
     const output = await handlePostToolUse(input, logger);

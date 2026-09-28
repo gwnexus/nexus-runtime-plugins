@@ -87,8 +87,35 @@ function buildAgentInfoFromActors(agentFile, catalogFile) {
   });
 }
 
+// core/project-root.ts
+import { statSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+function resolveProjectRoot(cwd, env = process.env) {
+  const projectDir = env.CLAUDE_PROJECT_DIR?.trim();
+  if (projectDir) return resolve(projectDir);
+  return findGitTopLevel(cwd ?? process.cwd());
+}
+function findGitTopLevel(start) {
+  let dir = resolve(start);
+  for (let i = 0; i < 64; i++) {
+    if (hasGitEntry(dir)) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+  return null;
+}
+function hasGitEntry(dir) {
+  try {
+    const st = statSync(resolve(dir, ".git"));
+    return st.isDirectory() || st.isFile();
+  } catch {
+    return false;
+  }
+}
+
 // adapters/claude-code/routing-guard/nexus-routing-guard.ts
-var PLUGIN_META = { name: "nexus-routing-guard", version: "1.0.0" };
+var PLUGIN_META = { name: "nexus-routing-guard", version: "1.0.1" };
 var ENV_ENABLED = "NEXUS_ROUTING_GUARD_ENABLED";
 var ENV_CATALOG_PATH = "NEXUS_ROUTING_GUARD_CATALOG_PATH";
 var ENV_AGENTS_PATH = "NEXUS_ROUTING_GUARD_AGENTS_PATH";
@@ -167,7 +194,9 @@ async function main() {
   } catch {
     process.exit(0);
   }
-  const directory = input.cwd ?? process.cwd();
+  const directory = resolveProjectRoot(input.cwd);
+  if (!directory) process.exit(0);
+  input = { ...input, cwd: directory };
   const fileLog = createFileLogger(directory, "routing-guard.log");
   const logger = (level, message) => fileLog(level, message);
   fileLog("info", "=== Plugin invoked ===");

@@ -5,7 +5,7 @@ between Nexus-configured agents and the effective merged provider/model
 catalog of the running OpenCode instance, for the
 [Nexus](https://nexus.gatewarden.eu) platform.
 
-**Current version:** `v1.0.0`
+**Current version:** `v1.0.1`
 **Requires:** none beyond `PluginInput.client` (no Nexus MCP session required)
 **Ref:** ADR-0001, dispatch `46bc744a-17c6-4aa1-9d8f-7d6f5ad881a4` (NEXUS-APP)
 

@@ -418,7 +418,8 @@ describe("agent-observer: adapter I/O", () => {
     expect(resolveObserverDir({ CLAUDE_PROJECT_DIR: "/p", NEXUS_AGENTIC_ROOT: "agentic" }, {})).toBe(
       "/p/agentic/claude/observer",
     )
-    expect(resolveObserverDir({}, { cwd: "/c" })).toBe("/c/.nexus/claude/observer")
+    // Bare cwd outside any git checkout is not a project root (Dispatch b7d15add).
+    expect(resolveObserverDir({}, { cwd: "/c" })).toBeNull()
   })
 
   it("does not create .nexus when the agentic root is missing", () => {

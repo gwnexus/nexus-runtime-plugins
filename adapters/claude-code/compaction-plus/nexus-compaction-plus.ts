@@ -60,8 +60,9 @@ import { getNexusConfig } from "../../../core/compaction-plus/config.ts"
 import { extractNexusState, cleanCompactedText, buildCompactionSummary } from "../../../core/compaction-plus/state.ts"
 import { appendCompactionEntry } from "../../../core/compaction-plus/api.ts"
 import type { NormalizedToolCall, NexusState } from "../../../core/compaction-plus/types.ts"
+import { resolveProjectRoot } from "../../../core/project-root.ts"
 
-const PLUGIN_META = { name: "nexus-compaction-plus", version: "1.8.1" } as const
+const PLUGIN_META = { name: "nexus-compaction-plus", version: "1.8.2" } as const
 
 interface ClaudeHookInput {
   cwd?: string
@@ -224,7 +225,11 @@ async function main(): Promise<void> {
     process.exit(0)
   }
 
-  const directory = input.cwd ?? process.cwd()
+  // Anchor every .nexus/ read and write at the project root, not the session's
+  // current cwd (Dispatch b7d15add); skip entirely when no root resolves.
+  const directory = resolveProjectRoot(input.cwd)
+  if (!directory) process.exit(0)
+  input = { ...input, cwd: directory }
   const fileLog = createFileLogger(directory, "compaction-plus.log")
   const logger = (level: string, message: string) => fileLog(level, message)
 

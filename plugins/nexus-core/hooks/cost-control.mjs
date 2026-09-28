@@ -296,8 +296,35 @@ function buildRuntimeCostEntry(nexusSessionId, usage) {
   };
 }
 
+// core/project-root.ts
+import { statSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+function resolveProjectRoot(cwd, env = process.env) {
+  const projectDir = env.CLAUDE_PROJECT_DIR?.trim();
+  if (projectDir) return resolve(projectDir);
+  return findGitTopLevel(cwd ?? process.cwd());
+}
+function findGitTopLevel(start) {
+  let dir = resolve(start);
+  for (let i = 0; i < 64; i++) {
+    if (hasGitEntry(dir)) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+  return null;
+}
+function hasGitEntry(dir) {
+  try {
+    const st = statSync(resolve(dir, ".git"));
+    return st.isDirectory() || st.isFile();
+  } catch {
+    return false;
+  }
+}
+
 // adapters/claude-code/cost-control/nexus-cost-control.ts
-var PLUGIN_META = { name: "nexus-cost-control", version: "1.2.0" };
+var PLUGIN_META = { name: "nexus-cost-control", version: "1.2.1" };
 var STATE_FILE = "cost-control-state.json";
 function initialState() {
   return { lastAppendAt: null, lastAppendedTokens: null };
@@ -447,7 +474,9 @@ async function main() {
   } catch {
     process.exit(0);
   }
-  const directory = input.cwd ?? process.cwd();
+  const directory = resolveProjectRoot(input.cwd);
+  if (!directory) process.exit(0);
+  input = { ...input, cwd: directory };
   const fileLog = createFileLogger(directory, "cost-control.log");
   const logger = (level, message) => fileLog(level, message);
   if (mode === "stop") {

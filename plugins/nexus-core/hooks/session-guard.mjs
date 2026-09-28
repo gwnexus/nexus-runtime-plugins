@@ -53,7 +53,7 @@ function saveState(directory, fileName, state) {
 // core/session-guard/logic.ts
 var PLUGIN_META = {
   name: "nexus-session-guard",
-  version: "1.1.3",
+  version: "1.1.4",
   description: "Detects code-changing tool completions and reminds the agent to call nexus_session_append before proceeding."
 };
 var DEFAULT_TRIGGER_TOOLS = /* @__PURE__ */ new Set(["Edit", "Write", "MultiEdit"]);
@@ -125,6 +125,33 @@ function evaluateToolCompletion(state, toolName, input) {
   return { action: "remind" };
 }
 
+// core/project-root.ts
+import { statSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+function resolveProjectRoot(cwd, env = process.env) {
+  const projectDir = env.CLAUDE_PROJECT_DIR?.trim();
+  if (projectDir) return resolve(projectDir);
+  return findGitTopLevel(cwd ?? process.cwd());
+}
+function findGitTopLevel(start) {
+  let dir = resolve(start);
+  for (let i = 0; i < 64; i++) {
+    if (hasGitEntry(dir)) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+  return null;
+}
+function hasGitEntry(dir) {
+  try {
+    const st = statSync(resolve(dir, ".git"));
+    return st.isDirectory() || st.isFile();
+  } catch {
+    return false;
+  }
+}
+
 // adapters/claude-code/session-guard/nexus-session-guard.ts
 var STATE_FILE = "session-guard-state.json";
 function normalizeClaudeToolName(toolName) {
@@ -183,7 +210,9 @@ async function main() {
   } catch {
     process.exit(0);
   }
-  const directory = input.cwd ?? process.cwd();
+  const directory = resolveProjectRoot(input.cwd);
+  if (!directory) process.exit(0);
+  input = { ...input, cwd: directory };
   const fileLog = createFileLogger(directory, "session-guard.log");
   const output = handleHookEvent(mode, input, fileLog);
   if (output) {

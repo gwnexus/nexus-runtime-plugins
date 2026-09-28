@@ -3,7 +3,7 @@
 An [OpenCode](https://opencode.ai) plugin that enforces session append discipline
 for the [Nexus](https://nexus.gatewarden.eu) platform.
 
-**Current version:** `v1.1.2`  
+**Current version:** `v1.1.4`  
 **Requires:** Nexus MCP server (active session)
 
 ## What it does
