@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "nexus-core",
   "displayName": "Nexus Core",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Nexus platform hooks and agents for Claude Code.",
   "author": {
     "name": "RELICFROG Consulting",

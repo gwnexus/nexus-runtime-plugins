@@ -1,6 +1,6 @@
 # nexus-core (Claude Code plugin)
 
-**Marketplace:** `gatewarden-nexus` · **Plugin:** `nexus-core` · **Version:** `1.2.0`
+**Marketplace:** `gatewarden-nexus` · **Plugin:** `nexus-core` · **Version:** `1.2.1`
 
 The Claude Code distribution of this repo's runtime plugins
 (`session-guard`, `headroom-intercept`, `compaction-plus`, `routing-guard`,

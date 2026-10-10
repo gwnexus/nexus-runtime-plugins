@@ -5,23 +5,34 @@
 import { existsSync as existsSync2, readFileSync as readFileSync3 } from "node:fs";
 
 // core/logger.ts
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, renameSync, statSync } from "node:fs";
 import { join } from "node:path";
-function createFileLogger(directory, logFileName) {
+var DEFAULT_MAX_LOG_BYTES = 5 * 1024 * 1024;
+var CHECK_EVERY_WRITES = 200;
+function createFileLogger(directory, logFileName, maxBytes = DEFAULT_MAX_LOG_BYTES) {
   let logDir = null;
+  let writes = 0;
   return (level, message) => {
     try {
       if (!logDir) {
         logDir = join(directory, ".nexus");
         mkdirSync(logDir, { recursive: true });
       }
+      const path = join(logDir, logFileName);
+      if (writes++ % CHECK_EVERY_WRITES === 0) rotateIfNeeded(path, maxBytes);
       const ts = (/* @__PURE__ */ new Date()).toISOString();
       const line = `[${ts}] [${level.toUpperCase().padEnd(5)}] ${message}
 `;
-      appendFileSync(join(logDir, logFileName), line);
+      appendFileSync(path, line);
     } catch {
     }
   };
+}
+function rotateIfNeeded(path, maxBytes) {
+  try {
+    if (statSync(path).size >= maxBytes) renameSync(path, `${path}.1`);
+  } catch {
+  }
 }
 
 // core/state-store.ts
@@ -297,7 +308,7 @@ function buildRuntimeCostEntry(nexusSessionId, usage) {
 }
 
 // core/project-root.ts
-import { statSync } from "node:fs";
+import { statSync as statSync2 } from "node:fs";
 import { dirname, resolve } from "node:path";
 function resolveProjectRoot(cwd, env = process.env) {
   const projectDir = env.CLAUDE_PROJECT_DIR?.trim();
@@ -316,7 +327,7 @@ function findGitTopLevel(start) {
 }
 function hasGitEntry(dir) {
   try {
-    const st = statSync(resolve(dir, ".git"));
+    const st = statSync2(resolve(dir, ".git"));
     return st.isDirectory() || st.isFile();
   } catch {
     return false;

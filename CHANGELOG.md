@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`nexus-core` v1.2.1 -- adapter logs in `.nexus/` grew without limit.** `core/logger.ts` (`createFileLogger`) only appended, and since 1.1.1 all sessions of a project share one log file per adapter. It now rotates a log to `<name>.1` once it reaches 5 MB (one old generation is kept, the previous one is overwritten) and starts a new file. The size is checked on the first write of each process and then every 200 writes, so both short-lived Claude Code hook processes and long-running OpenCode plugins are covered; a failed rotation never fails the hook. Applies to `session-guard.log`, `compaction-plus.log`, `cost-control.log` and `routing-guard.log` (`headroom-intercept.jsonl` and the agent observer already rotated). 5 new tests (`core/logger.test.ts`). `nexus-core` bundles rebuilt.
+
 ### Changed
 - **`nexus-core` v1.2.0 -- workflow skills removed; hooks and agents kept.** The plugin no longer ships the `adr-review`, `architecture-review`, `code-review`, `documentation-review`, `implementation-plan` and `test-ops` skills. Workflows that read or write Nexus artifacts belong to the project's own `/nexus-*` skills; the plugin's skills were a second path to the same jobs. The hooks and their bundles are unchanged. The agents `architect`, `reviewer`, `security-reviewer` and `documentation-reviewer` keep their names and now carry the checklists of the removed skills inline. New `scripts/nexus-core-plugin.test.ts` fails if `skills/` reappears or an agent is renamed or removed.
 
