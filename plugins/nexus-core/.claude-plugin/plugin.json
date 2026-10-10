@@ -2,8 +2,8 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "nexus-core",
   "displayName": "Nexus Core",
-  "version": "1.1.1",
-  "description": "Nexus platform hooks, skills, and agents for Claude Code.",
+  "version": "1.2.0",
+  "description": "Nexus platform hooks and agents for Claude Code.",
   "author": {
     "name": "RELICFROG Consulting",
     "url": "https://github.com/gwnexus"

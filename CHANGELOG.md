@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`nexus-core` v1.2.0 -- workflow skills removed; hooks and agents kept.** The plugin no longer ships the `adr-review`, `architecture-review`, `code-review`, `documentation-review`, `implementation-plan` and `test-ops` skills. Workflows that read or write Nexus artifacts belong to the project's own `/nexus-*` skills; the plugin's skills were a second path to the same jobs. The hooks and their bundles are unchanged. The agents `architect`, `reviewer`, `security-reviewer` and `documentation-reviewer` keep their names and now carry the checklists of the removed skills inline. New `scripts/nexus-core-plugin.test.ts` fails if `skills/` reappears or an agent is renamed or removed.
+
 ### Fixed
 - **`nexus-core` v1.1.1 -- Claude Code adapters wrote `.nexus/` into the session's current directory instead of the project root (Dispatch `b7d15add`, nexus-app).** Every Claude Code adapter resolved its base directory as `input.cwd ?? process.cwd()`. The hook's `cwd` is the session's *current* working directory, so once the agent `cd`-ed into a subfolder, `core/logger.ts` and `core/state-store.ts` created stray `.nexus/` folders there (e.g. `src/app/dashboard/projects/[id]/decisions/[decisionId]/.nexus/`), and adapter state was split per directory (session-guard's reminder logic saw a fresh state in each one). Config lookups (`.mcp.json`, `.nexus/config.toml`, `.nexus/generated/*`) also silently missed from subfolders.
   - New `core/project-root.ts` `resolveProjectRoot()`: `CLAUDE_PROJECT_DIR`, then the git top-level of `cwd` (filesystem walk to the nearest `.git` dir or file, no subprocess), else `null`. It never falls back to `cwd` itself.

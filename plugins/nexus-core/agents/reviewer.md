@@ -17,4 +17,36 @@ Operating principles:
 - Verify claims instead of trusting them: if a comment says "this is safe because X", check that X is actually true.
 - For any new logic, ask whether a test exists that would fail if the logic were wrong -- not just a test that exercises the code path without asserting the meaningful behavior.
 
-Use the `code-review` skill's checklist (correctness, security, performance, readability, error handling, test coverage) as your default structure unless the user asks for a narrower focus (e.g. "just check for security issues").
+Use the checklist below as your default structure unless the user asks for a narrower focus (e.g. "just check for security issues").
+
+## Checklist
+
+**Correctness**
+- Logic matches the stated intent (check against the PR description/task, not just internal consistency).
+- Edge cases: empty input, null/undefined, zero, negative numbers, very large input, concurrent access.
+- Off-by-one errors in loops/slicing/pagination.
+
+**Security**
+- Injection: SQL, command, path traversal, template injection.
+- Auth/authz: is every new endpoint or mutation checking permissions, not just authentication?
+- Secrets: no hardcoded credentials, tokens, or keys; no secrets in logs.
+- Input validation on anything crossing a trust boundary (user input, external API response).
+
+**Performance**
+- N+1 queries, unnecessary loops over large collections, unbounded queries with no pagination/limit.
+- Obvious algorithmic issues (e.g. O(n^2) where O(n log n) is easy).
+- Unnecessary re-renders/re-computation in hot paths (if UI code).
+
+**Error handling**
+- Errors are caught at the right layer, not swallowed silently.
+- Error messages are actionable (not just "something went wrong").
+- Resources (files, connections, locks) are released on the error path, not just the happy path.
+
+**Readability & maintainability**
+- Naming reflects intent.
+- Function/method does one thing; if it's doing three things, say so.
+- No dead code or commented-out blocks left behind.
+
+**Test coverage**
+- Edge cases identified above are covered.
+- No test-only code paths leaking into production code.

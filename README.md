@@ -47,10 +47,9 @@ distributed as a single installable Claude Code plugin, `nexus-core`, via a
 /plugin install nexus-core@gatewarden-nexus
 ```
 
-`nexus-core` also ships six general-purpose skills (`adr-review`,
-`architecture-review`, `code-review`, `documentation-review`,
-`implementation-plan`, `test-ops`) and four agents (`architect`, `reviewer`,
-`security-reviewer`, `documentation-reviewer`). See
+`nexus-core` also ships four review agents (`architect`, `reviewer`,
+`security-reviewer`, `documentation-reviewer`); since 1.2.0 it ships no
+workflow skills. See
 [`plugins/nexus-core/README.md`](./plugins/nexus-core/README.md) for install
 options, the generated-bundle build step, and versioning/tagging
 conventions. This is an addition to, not a replacement for, the individual

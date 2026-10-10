@@ -10,7 +10,7 @@
     {
       "name": "nexus-core",
       "source": "./plugins/nexus-core",
-      "description": "Nexus platform hooks, skills, and agents for Claude Code: session tracking (session-guard), compaction context preservation (compaction-plus), token cost visibility (cost-control), pre-injection MCP output compression (headroom-intercept), model/agent routing diagnostics (routing-guard), and agent observability events (agent-observer)."
+      "description": "Nexus platform hooks and agents for Claude Code: session tracking (session-guard), compaction context preservation (compaction-plus), token cost visibility (cost-control), pre-injection MCP output compression (headroom-intercept), model/agent routing diagnostics (routing-guard), and agent observability events (agent-observer)."
     }
   ]
 }

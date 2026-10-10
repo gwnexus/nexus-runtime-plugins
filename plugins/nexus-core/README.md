@@ -1,12 +1,12 @@
 # nexus-core (Claude Code plugin)
 
-**Marketplace:** `gatewarden-nexus` · **Plugin:** `nexus-core` · **Version:** `1.1.1`
+**Marketplace:** `gatewarden-nexus` · **Plugin:** `nexus-core` · **Version:** `1.2.0`
 
 The Claude Code distribution of this repo's runtime plugins
 (`session-guard`, `headroom-intercept`, `compaction-plus`, `routing-guard`,
 `cost-control`, and the Claude Code-only `agent-observer`), packaged as a single installable Claude Code plugin per
-ADR-0117 (nexus-app, accepted), plus a starter set of skills and agents for
-architecture/code/security/documentation review and implementation planning.
+ADR-0117 (nexus-app, accepted), plus four agents for
+architecture/code/security/documentation review.
 
 `600-attribution-headers` is intentionally excluded (ADR-C08) and has no
 Claude Code adapter.
@@ -45,13 +45,6 @@ plugins/nexus-core/
 │   └── agent-observer.mjs        # GENERATED -- do not edit directly
 ├── schemas/
 │   └── nexus.agent-observation.v1.schema.json   # record schema of observer/events.jsonl
-├── skills/
-│   ├── adr-review/
-│   ├── architecture-review/
-│   ├── code-review/
-│   ├── documentation-review/
-│   ├── implementation-plan/
-│   └── test-ops/
 └── agents/
     ├── architect.md
     ├── reviewer.md
@@ -88,16 +81,17 @@ Consumers validate against `schemas/nexus.agent-observation.v1.schema.json`.
 See `adapters/claude-code/agent-observer/README.md` for the derivation rules,
 guarantees and known gaps.
 
-## Skills and agents
+## Agents
 
-The six skills (`adr-review`, `architecture-review`, `code-review`,
-`documentation-review`, `implementation-plan`, `test-ops`) and four agents
-(`architect`, `reviewer`, `security-reviewer`, `documentation-reviewer`) are
-general-purpose software engineering skills -- they do not depend on the
-Nexus MCP server and work the same whether or not Nexus hooks are enabled.
-They are a starting point (per the originating dispatch, "content can start
-from the existing Nexus skills") and are expected to evolve independently of
-the hook bundles.
+The four agents (`architect`, `reviewer`, `security-reviewer`,
+`documentation-reviewer`) are general-purpose review engines -- they do not
+depend on the Nexus MCP server and work the same whether or not Nexus hooks
+are enabled. Each agent carries its review checklist inline. Their names are
+stable: project skills may run them internally.
+
+Since 1.2.0 the plugin ships no workflow skills. Workflows that read or
+write Nexus artifacts (reviews, ADRs, plans) belong to the project's own
+`/nexus-*` skills, so there is a single path to each job.
 
 ## Versioning and releases
 
