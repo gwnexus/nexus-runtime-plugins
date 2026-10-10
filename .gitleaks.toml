@@ -1,7 +1,12 @@
-# Gitleaks configuration for nexus-oc-plugins
+# Gitleaks configuration for nexus-runtime-plugins
 # Scans commits for leaked secrets before they reach the repository.
 
-title = "nexus-oc-plugins gitleaks config"
+title = "nexus-runtime-plugins gitleaks config"
+
+# Keep the built-in ruleset. A custom config without this replaces the
+# defaults and runs with zero rules.
+[extend]
+useDefault = true
 
 [allowlist]
   description = "Global allowlist"
