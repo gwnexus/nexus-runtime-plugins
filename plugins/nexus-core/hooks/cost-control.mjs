@@ -2,7 +2,7 @@
 // GENERATED FILE -- do not edit directly. Built from adapters/claude-code/cost-control/nexus-cost-control.ts by scripts/build-nexus-core-plugin.mjs. Re-run that script after changing the source.
 
 // adapters/claude-code/cost-control/nexus-cost-control.ts
-import { existsSync as existsSync2, readFileSync as readFileSync3 } from "node:fs";
+import { existsSync as existsSync2, readFileSync as readFileSync4 } from "node:fs";
 
 // core/logger.ts
 import { appendFileSync, mkdirSync, renameSync, statSync } from "node:fs";
@@ -65,43 +65,78 @@ function saveState(directory, fileName, state) {
 }
 
 // core/cost-control/config.ts
+import { readFileSync as readFileSync3 } from "node:fs";
+import { join as join4 } from "node:path";
+
+// core/nexus-config.ts
 import { readFileSync as readFileSync2 } from "node:fs";
 import { join as join3 } from "node:path";
-function getNexusConfig(_directory) {
-  const apiUrl = process.env.NEXUS_API_URL;
-  const token = process.env.NEXUS_PRIVATE_TOKEN;
-  if (apiUrl && token) return { apiUrl, token };
-  try {
-    const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
-    const nexusConfigDir = join3(home, ".config", "nexus");
-    let resolvedApiUrl;
-    try {
-      const raw = readFileSync2(join3(nexusConfigDir, "config.toml"), "utf-8");
-      const m = raw.match(/^\s*api_url\s*=\s*"([^"]+)"/m);
-      if (m) resolvedApiUrl = m[1];
-    } catch {
-    }
-    let resolvedToken;
-    try {
-      const raw = readFileSync2(join3(nexusConfigDir, "credentials.toml"), "utf-8");
-      const m = raw.match(/^\s*token\s*=\s*"([^"]+)"/m);
-      if (m) resolvedToken = m[1];
-    } catch {
-    }
-    if (resolvedApiUrl && resolvedToken) {
-      return { apiUrl: resolvedApiUrl, token: resolvedToken };
-    }
-  } catch {
+function resolveNexusConfig(directory, env = process.env) {
+  const fromEnv = { apiUrl: nonEmpty(env.NEXUS_API_URL), token: nonEmpty(env.NEXUS_PRIVATE_TOKEN) };
+  if (fromEnv.apiUrl && fromEnv.token) return { apiUrl: fromEnv.apiUrl, token: fromEnv.token, source: "env" };
+  const project = readTomlPair(join3(directory, ".nexus"));
+  const pinnedUrl = project.apiUrl ? normalizeUrl(project.apiUrl) : null;
+  if (project.apiUrl && project.token) return { apiUrl: project.apiUrl, token: project.token, source: "project" };
+  const home = env.HOME ?? env.USERPROFILE ?? "";
+  const later = [
+    ["mcp", () => readJsonEnv(join3(directory, ".mcp.json"), (j) => j?.mcpServers?.nexus?.env)],
+    ["opencode", () => readJsonEnv(join3(directory, "opencode.json"), (j) => j?.mcp?.nexus?.environment)],
+    ["global", () => home ? readTomlPair(join3(home, ".config", "nexus")) : {}]
+  ];
+  for (const [source, read] of later) {
+    const c = read();
+    if (!c.apiUrl || !c.token) continue;
+    if (pinnedUrl && normalizeUrl(c.apiUrl) !== pinnedUrl) continue;
+    return { apiUrl: c.apiUrl, token: c.token, source };
   }
   return null;
+}
+function readTomlPair(dir) {
+  return {
+    apiUrl: readTomlString(join3(dir, "config.toml"), "api_url"),
+    token: readTomlString(join3(dir, "credentials.toml"), "token")
+  };
+}
+function readTomlString(path, key) {
+  try {
+    const m = readFileSync2(path, "utf-8").match(new RegExp(`^\\s*${key}\\s*=\\s*"([^"]+)"`, "m"));
+    return m ? nonEmpty(m[1]) : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function readJsonEnv(path, pick) {
+  try {
+    const block = pick(JSON.parse(readFileSync2(path, "utf-8")));
+    if (typeof block !== "object" || block === null) return {};
+    const e = block;
+    return {
+      apiUrl: typeof e.NEXUS_API_URL === "string" ? nonEmpty(e.NEXUS_API_URL) : void 0,
+      token: typeof e.NEXUS_PRIVATE_TOKEN === "string" ? nonEmpty(e.NEXUS_PRIVATE_TOKEN) : void 0
+    };
+  } catch {
+    return {};
+  }
+}
+function nonEmpty(v) {
+  const t = v?.trim();
+  return t && !t.startsWith("${") ? t : void 0;
+}
+function normalizeUrl(url) {
+  return url.trim().replace(/\/+$/, "").toLowerCase();
+}
+
+// core/cost-control/config.ts
+function getNexusConfig(directory) {
+  return resolveNexusConfig(directory);
 }
 function getHeliconeConfig(_directory) {
   const apiKey = process.env.HELICONE_API_KEY;
   if (apiKey) return { apiKey };
   try {
     const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
-    const configPath = join3(home, ".config", "nexus", "config.toml");
-    const raw = readFileSync2(configPath, "utf-8");
+    const configPath = join4(home, ".config", "nexus", "config.toml");
+    const raw = readFileSync3(configPath, "utf-8");
     const m = raw.match(/^\s*helicone_api_key\s*=\s*"([^"]+)"/m);
     if (m) return { apiKey: m[1] };
   } catch {
@@ -347,7 +382,7 @@ function isEntrypoint(moduleUrl, argv1 = process.argv[1]) {
 }
 
 // adapters/claude-code/cost-control/nexus-cost-control.ts
-var PLUGIN_META = { name: "nexus-cost-control", version: "1.2.1" };
+var PLUGIN_META = { name: "nexus-cost-control", version: "1.2.2" };
 var STATE_FILE = "cost-control-state.json";
 function initialState() {
   return { lastAppendAt: null, lastAppendedTokens: null };
@@ -357,7 +392,7 @@ function parseClaudeTranscript(transcriptPath) {
   if (!existsSync2(transcriptPath)) return calls;
   let raw;
   try {
-    raw = readFileSync3(transcriptPath, "utf-8");
+    raw = readFileSync4(transcriptPath, "utf-8");
   } catch {
     return calls;
   }
@@ -375,7 +410,7 @@ function parseClaudeTranscript(transcriptPath) {
     if (!Array.isArray(content)) continue;
     for (const block of content) {
       if (block?.type === "tool_use" && typeof block.name === "string") {
-        pendingById.set(block.id, { tool: block.name, args: block.input ?? {} });
+        pendingById.set(block.id, { tool: block.name.replace(/^mcp__nexus__/, "nexus_"), args: block.input ?? {} });
       }
       if (block?.type === "tool_result" && block.tool_use_id) {
         const text = Array.isArray(block.content) ? block.content.find((c) => c?.type === "text")?.text : typeof block.content === "string" ? block.content : void 0;
@@ -402,7 +437,7 @@ function aggregateClaudeUsage(transcriptPath) {
   if (!existsSync2(transcriptPath)) return usage;
   let raw;
   try {
-    raw = readFileSync3(transcriptPath, "utf-8");
+    raw = readFileSync4(transcriptPath, "utf-8");
   } catch {
     return usage;
   }
@@ -436,9 +471,10 @@ async function handleStop(input, logger) {
   const nexusConfig = getNexusConfig(directory);
   const heliconeConfig = getHeliconeConfig(directory);
   if (!nexusConfig) {
-    logger("debug", "Stop \u2014 skipping (Nexus config not present)");
+    logger("info", "Stop \u2014 skipping (no Nexus credentials found in env, project, mcp, opencode or global config)");
     return;
   }
+  logger("debug", `Stop \u2014 Nexus credentials from source "${nexusConfig.source}"`);
   const state = loadState(directory, STATE_FILE, initialState());
   if (state.lastAppendAt && Date.now() - state.lastAppendAt < IDLE_DEBOUNCE_MS) {
     logger("debug", `Stop \u2014 skipping (last append ${Date.now() - state.lastAppendAt}ms ago)`);

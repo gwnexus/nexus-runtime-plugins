@@ -1,3 +1,5 @@
+import type { NexusConfigSource } from "../nexus-config.ts"
+
 /**
  * nexus-compaction-plus core types (ADR-C05 core module) — runtime-agnostic.
  */
@@ -12,6 +14,8 @@ export interface NexusState {
 export interface NexusConfig {
   apiUrl: string
   token: string
+  /** Where the credentials came from (core/nexus-config.ts), for logs. */
+  source?: NexusConfigSource
 }
 
 /**

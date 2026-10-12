@@ -18,7 +18,7 @@ import type { NormalizedToolCall } from "../../../core/compaction-plus/types.ts"
  */
 const PLUGIN_META = {
   name: "nexus-compaction-plus",
-  version: "1.8.2",
+  version: "1.8.3",
   description:
     "Preserves Nexus session context across compaction and records compaction events in the active session.",
 } as const
@@ -95,7 +95,7 @@ export const NexusCompactionPlus: Plugin = async (ctx) => {
   fileLog(
     "info",
     nexusConfig
-      ? `Nexus API configured: ${nexusConfig.apiUrl}`
+      ? `Nexus API configured: ${nexusConfig.apiUrl} (source: ${nexusConfig.source})`
       : "WARNING: Nexus credentials not found — post-compaction recording disabled",
   )
 

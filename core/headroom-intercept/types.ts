@@ -1,3 +1,5 @@
+import type { NexusConfigSource } from "../nexus-config.ts"
+
 /**
  * nexus-headroom-intercept core types (ADR-C05 core module).
  * Runtime-agnostic — shared by the OpenCode and Claude Code adapters.
@@ -69,7 +71,8 @@ export type PluginMode = "observe" | "transform"
 export interface NexusConfig {
   apiUrl: string
   token: string
-  source?: string
+  /** Where the credentials came from (core/nexus-config.ts), for logs. */
+  source?: NexusConfigSource
 }
 
 export interface ProjectContext {

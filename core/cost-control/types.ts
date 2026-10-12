@@ -1,3 +1,5 @@
+import type { NexusConfigSource } from "../nexus-config.ts"
+
 /**
  * nexus-cost-control core types (ADR-C05 core module) — runtime-agnostic.
  */
@@ -5,6 +7,8 @@
 export interface NexusConfig {
   apiUrl: string
   token: string
+  /** Where the credentials came from (core/nexus-config.ts), for logs. */
+  source?: NexusConfigSource
 }
 
 export interface HeliconeConfig {

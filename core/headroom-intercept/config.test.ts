@@ -63,20 +63,20 @@ describe("headroom-intercept core config resolution order", () => {
   it("resolves from .mcp.json when env vars are absent", () => {
     setFile(MCP_JSON, JSON.stringify({ mcpServers: { nexus: { env: { NEXUS_API_URL: "https://staging.example.com", NEXUS_PRIVATE_TOKEN: "staging-token" } } } }))
     const config = getNexusConfig(DIR)
-    expect(config).toEqual({ apiUrl: "https://staging.example.com", token: "staging-token", source: ".mcp.json" })
+    expect(config).toEqual({ apiUrl: "https://staging.example.com", token: "staging-token", source: "mcp" })
   })
 
   it("falls back to opencode.json when .mcp.json is absent", () => {
     setFile(OPENCODE_JSON, JSON.stringify({ mcp: { nexus: { environment: { NEXUS_API_URL: "https://oc.example.com", NEXUS_PRIVATE_TOKEN: "oc-token" } } } }))
     const config = getNexusConfig(DIR)
-    expect(config).toEqual({ apiUrl: "https://oc.example.com", token: "oc-token", source: "opencode.json" })
+    expect(config).toEqual({ apiUrl: "https://oc.example.com", token: "oc-token", source: "opencode" })
   })
 
   it("falls back to project-local .nexus/config.toml + credentials.toml when no .mcp.json/opencode.json", () => {
     setFile(PROJECT_CONFIG, 'api_url = "https://project-local.example.com"\n')
     setFile(PROJECT_CREDS, 'token = "project-local-token"\n')
     const config = getNexusConfig(DIR)
-    expect(config).toEqual({ apiUrl: "https://project-local.example.com", token: "project-local-token", source: "project-local-config" })
+    expect(config).toEqual({ apiUrl: "https://project-local.example.com", token: "project-local-token", source: "project" })
   })
 
   it("prefers project-local config over global config (staging vs prod fix)", () => {
@@ -85,14 +85,14 @@ describe("headroom-intercept core config resolution order", () => {
     setFile(GLOBAL_CONFIG, 'api_url = "https://prod.example.com"\n')
     setFile(GLOBAL_CREDS, 'token = "prod-token"\n')
     const config = getNexusConfig(DIR)
-    expect(config).toEqual({ apiUrl: "https://staging.example.com", token: "staging-token", source: "project-local-config" })
+    expect(config).toEqual({ apiUrl: "https://staging.example.com", token: "staging-token", source: "project" })
   })
 
   it("falls back to global config as last resort", () => {
     setFile(GLOBAL_CONFIG, 'api_url = "https://prod.example.com"\n')
     setFile(GLOBAL_CREDS, 'token = "prod-token"\n')
     const config = getNexusConfig(DIR)
-    expect(config).toEqual({ apiUrl: "https://prod.example.com", token: "prod-token", source: "global-config" })
+    expect(config).toEqual({ apiUrl: "https://prod.example.com", token: "prod-token", source: "global" })
   })
 
   it("returns null when no source resolves", () => {

@@ -3,7 +3,7 @@
 An [OpenCode](https://opencode.ai) plugin that surfaces token usage and cost
 visibility inside [Nexus](https://nexus.gatewarden.eu) sessions.
 
-**Current version:** `v1.2.1`  
+**Current version:** `v1.2.2`  
 **Tracking mechanism:** native OpenCode message-data aggregation (zero-config, primary), with optional [Helicone](https://helicone.ai) enrichment  
 **Requires:** `NEXUS_API_URL`, `NEXUS_PRIVATE_TOKEN` (`HELICONE_API_KEY` is optional)
 
@@ -15,7 +15,7 @@ visibility inside [Nexus](https://nexus.gatewarden.eu) sessions.
 > data. Earlier `v1.1.0` inverted this (gated everything on Helicone being
 > configured, with native aggregation only as a fallback for empty
 > Helicone responses) -- a drift from ADR-0040 introduced during the
-> ADR-C05 core/adapters restructure, corrected in `v1.2.1` per Dispatch
+> ADR-C05 core/adapters restructure, corrected in `v1.2.2` per Dispatch
 > `6298a740`.
 
 > Migrated to the ADR-C05 `core/` + `adapters/` structure (Track B2, the

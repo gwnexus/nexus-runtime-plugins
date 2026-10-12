@@ -61,7 +61,7 @@ import type { NormalizedToolCall } from "../../../core/cost-control/types.ts"
 import { resolveProjectRoot } from "../../../core/project-root.ts"
 import { isEntrypoint } from "../../../core/entrypoint.ts"
 
-const PLUGIN_META = { name: "nexus-cost-control", version: "1.2.1" } as const
+const PLUGIN_META = { name: "nexus-cost-control", version: "1.2.2" } as const
 const STATE_FILE = "cost-control-state.json"
 
 interface CostControlState {
@@ -111,7 +111,8 @@ export function parseClaudeTranscript(transcriptPath: string): NormalizedToolCal
 
     for (const block of content) {
       if (block?.type === "tool_use" && typeof block.name === "string") {
-        pendingById.set(block.id, { tool: block.name, args: block.input ?? {} })
+        // Claude Code names Nexus MCP tools `mcp__nexus__X`; the core expects `nexus_X`.
+        pendingById.set(block.id, { tool: block.name.replace(/^mcp__nexus__/, "nexus_"), args: block.input ?? {} })
       }
       if (block?.type === "tool_result" && block.tool_use_id) {
         const text = Array.isArray(block.content)
@@ -201,9 +202,10 @@ export async function handleStop(
   const heliconeConfig = getHeliconeConfig(directory)
 
   if (!nexusConfig) {
-    logger("debug", "Stop — skipping (Nexus config not present)")
+    logger("info", "Stop — skipping (no Nexus credentials found in env, project, mcp, opencode or global config)")
     return
   }
+  logger("debug", `Stop — Nexus credentials from source "${nexusConfig.source}"`)
 
   const state = loadState<CostControlState>(directory, STATE_FILE, initialState())
 

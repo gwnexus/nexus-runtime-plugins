@@ -1,46 +1,15 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import { resolveNexusConfig } from "../nexus-config.ts"
 import type { NexusConfig, HeliconeConfig } from "./types.ts"
 
 /**
- * Nexus and Helicone credential resolution (ADR-C05 core module) —
- * runtime-agnostic (fs only). Unchanged behavior from the original plugin.
+ * Nexus credentials: the shared resolver in core/nexus-config.ts (env,
+ * project-local `.nexus/`, .mcp.json, opencode.json, global CLI config).
+ * `source` names where they came from, for logs; never log the token.
  */
-export function getNexusConfig(_directory: string): NexusConfig | null {
-  const apiUrl = process.env.NEXUS_API_URL
-  const token = process.env.NEXUS_PRIVATE_TOKEN
-  if (apiUrl && token) return { apiUrl, token }
-
-  try {
-    const home = process.env.HOME ?? process.env.USERPROFILE ?? ""
-    const nexusConfigDir = join(home, ".config", "nexus")
-
-    let resolvedApiUrl: string | undefined
-    try {
-      const raw = readFileSync(join(nexusConfigDir, "config.toml"), "utf-8")
-      const m = raw.match(/^\s*api_url\s*=\s*"([^"]+)"/m)
-      if (m) resolvedApiUrl = m[1]
-    } catch {
-      /* not found */
-    }
-
-    let resolvedToken: string | undefined
-    try {
-      const raw = readFileSync(join(nexusConfigDir, "credentials.toml"), "utf-8")
-      const m = raw.match(/^\s*token\s*=\s*"([^"]+)"/m)
-      if (m) resolvedToken = m[1]
-    } catch {
-      /* not found */
-    }
-
-    if (resolvedApiUrl && resolvedToken) {
-      return { apiUrl: resolvedApiUrl, token: resolvedToken }
-    }
-  } catch {
-    /* ~/.config/nexus not accessible */
-  }
-
-  return null
+export function getNexusConfig(directory: string): NexusConfig | null {
+  return resolveNexusConfig(directory)
 }
 
 /**

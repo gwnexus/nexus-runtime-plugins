@@ -30,7 +30,7 @@ describe("compaction-plus core config", () => {
     process.env.NEXUS_API_URL = "https://nexus.example.com"
     process.env.NEXUS_PRIVATE_TOKEN = "tok-123"
     const config = getNexusConfig("/tmp/project")
-    expect(config).toEqual({ apiUrl: "https://nexus.example.com", token: "tok-123" })
+    expect(config).toEqual({ apiUrl: "https://nexus.example.com", token: "tok-123", source: "env" })
   })
 
   it("returns null when no env vars and no global config files exist", () => {

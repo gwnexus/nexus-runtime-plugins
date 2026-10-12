@@ -27,9 +27,9 @@ auto-discovery mechanism (`.opencode/plugins/`). Migrated plugins (see
 
 | Plugin | Version | Description |
 | --- | --- | --- |
-| [**Compaction Plus**](./adapters/opencode/compaction-plus/README.md) | `v1.8.1` | Preserves Nexus session context across compaction events (OpenCode + Claude Code adapters) |
-| [**Cost Control**](./adapters/opencode/cost-control/README.md) | `v1.2.0` | Token usage and cost tracking via native runtime aggregation, with optional Helicone enrichment (OpenCode + Claude Code adapters) |
-| [**Headroom Intercept**](./adapters/opencode/headroom-intercept/README.md) | `v0.5.17` | Pre-injection context compression for Nexus MCP tool outputs (OpenCode + Claude Code adapters) |
+| [**Compaction Plus**](./adapters/opencode/compaction-plus/README.md) | `v1.8.3` | Preserves Nexus session context across compaction events (OpenCode + Claude Code adapters) |
+| [**Cost Control**](./adapters/opencode/cost-control/README.md) | `v1.2.2` | Token usage and cost tracking via native runtime aggregation, with optional Helicone enrichment (OpenCode + Claude Code adapters) |
+| [**Headroom Intercept**](./adapters/opencode/headroom-intercept/README.md) | `v0.5.19` | Pre-injection context compression for Nexus MCP tool outputs (OpenCode + Claude Code adapters) |
 | [**Session Guard**](./adapters/opencode/session-guard/README.md) | `v1.2.0` | Enforces session append discipline after code-changing tool calls (OpenCode + Claude Code adapters) |
 | [**Routing Guard**](./adapters/opencode/routing-guard/README.md) | `v1.0.0` | Detects model routing divergence between Nexus config and the effective provider catalog (OpenCode + Claude Code adapters) |
 | [**Attribution Headers**](./600-attribution-headers/README.md) | `v1.0.0` | Injects session/actor attribution headers on outgoing requests to the Nexus gateway provider |
@@ -59,7 +59,7 @@ full plugin/marketplace mechanism.
 
 ## Compaction Plus
 
-**`v1.8.1` · [`adapters/opencode/compaction-plus`](./adapters/opencode/compaction-plus) (OpenCode) · [`adapters/claude-code/compaction-plus`](./adapters/claude-code/compaction-plus) (Claude Code)**
+**`v1.8.3` · [`adapters/opencode/compaction-plus`](./adapters/opencode/compaction-plus) (OpenCode) · [`adapters/claude-code/compaction-plus`](./adapters/claude-code/compaction-plus) (Claude Code)**
 
 > Migrated to the ADR-C05 `core/` + `adapters/` structure. State extraction,
 > context building, and the Nexus API call live in
@@ -90,7 +90,7 @@ This plugin solves that by hooking directly into the compaction lifecycle:
 
 ## Cost Control
 
-**`v1.2.0` · [`adapters/opencode/cost-control`](./adapters/opencode/cost-control) (OpenCode) · [`adapters/claude-code/cost-control`](./adapters/claude-code/cost-control) (Claude Code)**
+**`v1.2.2` · [`adapters/opencode/cost-control`](./adapters/opencode/cost-control) (OpenCode) · [`adapters/claude-code/cost-control`](./adapters/claude-code/cost-control) (Claude Code)**
 
 > Migrated to the ADR-C05 `core/` + `adapters/` structure (Track B2, the
 > last plugin in this restructure pass). Credential resolution, state
@@ -126,7 +126,7 @@ removing the Helicone dependency.
 
 ## Headroom Intercept
 
-**`v0.5.17` · [`adapters/opencode/headroom-intercept`](./adapters/opencode/headroom-intercept) (OpenCode) · [`adapters/claude-code/headroom-intercept`](./adapters/claude-code/headroom-intercept) (Claude Code)**
+**`v0.5.19` · [`adapters/opencode/headroom-intercept`](./adapters/opencode/headroom-intercept) (OpenCode) · [`adapters/claude-code/headroom-intercept`](./adapters/claude-code/headroom-intercept) (Claude Code)**
 
 > Migrated to the ADR-C05 `core/` + `adapters/` structure. All policy,
 > compression, cache, and credential-resolution logic lives in

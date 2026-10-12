@@ -32,7 +32,7 @@ describe("cost-control core config", () => {
   it("resolves Nexus config from environment variables", () => {
     process.env.NEXUS_API_URL = "https://nexus.example.com"
     process.env.NEXUS_PRIVATE_TOKEN = "tok-123"
-    expect(getNexusConfig("/tmp/project")).toEqual({ apiUrl: "https://nexus.example.com", token: "tok-123" })
+    expect(getNexusConfig("/tmp/project")).toEqual({ apiUrl: "https://nexus.example.com", token: "tok-123", source: "env" })
   })
 
   it("returns null Nexus config when nothing is configured", () => {

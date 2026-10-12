@@ -137,136 +137,80 @@ function evaluateToolCompletion(state, toolName, input) {
 }
 
 // core/session-guard/release-line.ts
-import { readFileSync as readFileSync3, statSync as statSync2 } from "node:fs";
-import { isAbsolute, join as join4, resolve } from "node:path";
+import { readFileSync as readFileSync4, statSync as statSync2 } from "node:fs";
+import { isAbsolute, join as join5, resolve } from "node:path";
 
 // core/headroom-intercept/config.ts
-import { existsSync as existsSync2, readFileSync as readFileSync2 } from "node:fs";
+import { existsSync as existsSync2, readFileSync as readFileSync3 } from "node:fs";
+import { join as join4 } from "node:path";
+
+// core/nexus-config.ts
+import { readFileSync as readFileSync2 } from "node:fs";
 import { join as join3 } from "node:path";
-function readMcpJsonNexusCreds(directory) {
-  try {
-    const mcpPath = join3(directory, ".mcp.json");
-    if (!existsSync2(mcpPath)) return {};
-    const raw = readFileSync2(mcpPath, "utf-8");
-    const parsed = JSON.parse(raw);
-    const env = parsed.mcpServers?.nexus?.env ?? {};
-    const apiUrl = typeof env.NEXUS_API_URL === "string" ? env.NEXUS_API_URL : void 0;
-    const token = typeof env.NEXUS_PRIVATE_TOKEN === "string" ? env.NEXUS_PRIVATE_TOKEN : void 0;
-    return { apiUrl, token };
-  } catch {
-    return {};
-  }
-}
-function readProjectLocalTomlCreds(directory) {
-  try {
-    const nexusDir = join3(directory, ".nexus");
-    const configPath = join3(nexusDir, "config.toml");
-    const credsPath = join3(nexusDir, "credentials.toml");
-    let apiUrl;
-    let token;
-    if (existsSync2(configPath)) {
-      const raw = readFileSync2(configPath, "utf-8");
-      const m = raw.match(/api_url\s*=\s*"([^"]+)"/);
-      if (m) apiUrl = m[1];
-    }
-    if (existsSync2(credsPath)) {
-      const raw = readFileSync2(credsPath, "utf-8");
-      const m = raw.match(/^\s*token\s*=\s*"([^"]+)"/m);
-      if (m) token = m[1];
-    }
-    return { apiUrl, token };
-  } catch {
-    return {};
-  }
-}
-function readOpencodeJsonNexusCreds(directory) {
-  try {
-    const ocPath = join3(directory, "opencode.json");
-    if (!existsSync2(ocPath)) return {};
-    const raw = readFileSync2(ocPath, "utf-8");
-    const parsed = JSON.parse(raw);
-    const env = parsed.mcp?.nexus?.environment ?? {};
-    const apiUrl = typeof env.NEXUS_API_URL === "string" ? env.NEXUS_API_URL : void 0;
-    const token = typeof env.NEXUS_PRIVATE_TOKEN === "string" ? env.NEXUS_PRIVATE_TOKEN : void 0;
-    return { apiUrl, token };
-  } catch {
-    return {};
-  }
-}
-function getNexusConfig(directory) {
-  let resolvedUrl = process.env.NEXUS_API_URL;
-  let resolvedToken = process.env.NEXUS_PRIVATE_TOKEN;
-  let source = "env";
-  if (resolvedUrl && resolvedToken) {
-    return { apiUrl: resolvedUrl, token: resolvedToken, source };
-  }
-  const mcpCreds = readMcpJsonNexusCreds(directory);
-  if (!resolvedUrl && mcpCreds.apiUrl) {
-    resolvedUrl = mcpCreds.apiUrl;
-    source = ".mcp.json";
-  }
-  if (!resolvedToken && mcpCreds.token) {
-    resolvedToken = mcpCreds.token;
-    source = ".mcp.json";
-  }
-  if (resolvedUrl && resolvedToken) {
-    return { apiUrl: resolvedUrl, token: resolvedToken, source };
-  }
-  const ocCreds = readOpencodeJsonNexusCreds(directory);
-  if (!resolvedUrl && ocCreds.apiUrl) {
-    resolvedUrl = ocCreds.apiUrl;
-    source = "opencode.json";
-  }
-  if (!resolvedToken && ocCreds.token) {
-    resolvedToken = ocCreds.token;
-    source = "opencode.json";
-  }
-  if (resolvedUrl && resolvedToken) {
-    return { apiUrl: resolvedUrl, token: resolvedToken, source };
-  }
-  const projectCreds = readProjectLocalTomlCreds(directory);
-  if (!resolvedUrl && projectCreds.apiUrl) {
-    resolvedUrl = projectCreds.apiUrl;
-    source = "project-local-config";
-  }
-  if (!resolvedToken && projectCreds.token) {
-    resolvedToken = projectCreds.token;
-    source = "project-local-config";
-  }
-  if (resolvedUrl && resolvedToken) {
-    return { apiUrl: resolvedUrl, token: resolvedToken, source };
-  }
-  try {
-    const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
-    const configDir = join3(home, ".config", "nexus");
-    const configPath = join3(configDir, "config.toml");
-    const credsPath = join3(configDir, "credentials.toml");
-    if (!resolvedUrl && existsSync2(configPath)) {
-      const raw = readFileSync2(configPath, "utf-8");
-      const m = raw.match(/api_url\s*=\s*"([^"]+)"/);
-      if (m) {
-        resolvedUrl = m[1];
-        source = "global-config";
-      }
-    }
-    if (!resolvedToken && existsSync2(credsPath)) {
-      const raw = readFileSync2(credsPath, "utf-8");
-      const m = raw.match(/^\s*token\s*=\s*"([^"]+)"/m);
-      if (m) {
-        resolvedToken = m[1];
-        source = "global-config";
-      }
-    }
-    if (resolvedUrl && resolvedToken) return { apiUrl: resolvedUrl, token: resolvedToken, source };
-  } catch {
+function resolveNexusConfig(directory, env = process.env) {
+  const fromEnv = { apiUrl: nonEmpty(env.NEXUS_API_URL), token: nonEmpty(env.NEXUS_PRIVATE_TOKEN) };
+  if (fromEnv.apiUrl && fromEnv.token) return { apiUrl: fromEnv.apiUrl, token: fromEnv.token, source: "env" };
+  const project = readTomlPair(join3(directory, ".nexus"));
+  const pinnedUrl = project.apiUrl ? normalizeUrl(project.apiUrl) : null;
+  if (project.apiUrl && project.token) return { apiUrl: project.apiUrl, token: project.token, source: "project" };
+  const home = env.HOME ?? env.USERPROFILE ?? "";
+  const later = [
+    ["mcp", () => readJsonEnv(join3(directory, ".mcp.json"), (j) => j?.mcpServers?.nexus?.env)],
+    ["opencode", () => readJsonEnv(join3(directory, "opencode.json"), (j) => j?.mcp?.nexus?.environment)],
+    ["global", () => home ? readTomlPair(join3(home, ".config", "nexus")) : {}]
+  ];
+  for (const [source, read] of later) {
+    const c = read();
+    if (!c.apiUrl || !c.token) continue;
+    if (pinnedUrl && normalizeUrl(c.apiUrl) !== pinnedUrl) continue;
+    return { apiUrl: c.apiUrl, token: c.token, source };
   }
   return null;
 }
+function readTomlPair(dir) {
+  return {
+    apiUrl: readTomlString(join3(dir, "config.toml"), "api_url"),
+    token: readTomlString(join3(dir, "credentials.toml"), "token")
+  };
+}
+function readTomlString(path, key) {
+  try {
+    const m = readFileSync2(path, "utf-8").match(new RegExp(`^\\s*${key}\\s*=\\s*"([^"]+)"`, "m"));
+    return m ? nonEmpty(m[1]) : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function readJsonEnv(path, pick) {
+  try {
+    const block = pick(JSON.parse(readFileSync2(path, "utf-8")));
+    if (typeof block !== "object" || block === null) return {};
+    const e = block;
+    return {
+      apiUrl: typeof e.NEXUS_API_URL === "string" ? nonEmpty(e.NEXUS_API_URL) : void 0,
+      token: typeof e.NEXUS_PRIVATE_TOKEN === "string" ? nonEmpty(e.NEXUS_PRIVATE_TOKEN) : void 0
+    };
+  } catch {
+    return {};
+  }
+}
+function nonEmpty(v) {
+  const t = v?.trim();
+  return t && !t.startsWith("${") ? t : void 0;
+}
+function normalizeUrl(url) {
+  return url.trim().replace(/\/+$/, "").toLowerCase();
+}
+
+// core/headroom-intercept/config.ts
+function getNexusConfig(directory) {
+  return resolveNexusConfig(directory);
+}
 function readProjectIdFromAgentsMd(directory) {
   try {
-    const agentsPath = join3(directory, ".nexus", "AGENTS.md");
+    const agentsPath = join4(directory, ".nexus", "AGENTS.md");
     if (!existsSync2(agentsPath)) return null;
-    const raw = readFileSync2(agentsPath, "utf-8");
+    const raw = readFileSync3(agentsPath, "utf-8");
     const fmMatch = raw.match(/^---\s*\n([\s\S]*?)\n---/);
     if (!fmMatch) return null;
     const pidMatch = fmMatch[1].match(/project_id:\s*([0-9a-f-]{36})/);
@@ -286,15 +230,15 @@ function isReleaseNudgeEnabled(env = process.env) {
 }
 function readGitBranch(projectRoot) {
   try {
-    const gitPath = join4(projectRoot, ".git");
+    const gitPath = join5(projectRoot, ".git");
     let gitDir = gitPath;
     if (statSync2(gitPath).isFile()) {
-      const m = readFileSync3(gitPath, "utf-8").match(/^gitdir:\s*(.+)$/m);
+      const m = readFileSync4(gitPath, "utf-8").match(/^gitdir:\s*(.+)$/m);
       if (!m) return null;
       const raw = m[1].trim();
       gitDir = isAbsolute(raw) ? raw : resolve(projectRoot, raw);
     }
-    const head = readFileSync3(join4(gitDir, "HEAD"), "utf-8").trim();
+    const head = readFileSync4(join5(gitDir, "HEAD"), "utf-8").trim();
     const ref = head.match(/^ref:\s*refs\/heads\/(.+)$/);
     return ref ? ref[1] : null;
   } catch {

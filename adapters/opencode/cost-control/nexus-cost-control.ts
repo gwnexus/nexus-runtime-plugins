@@ -28,7 +28,7 @@ import type { NormalizedToolCall } from "../../../core/cost-control/types.ts"
  */
 const PLUGIN_META = {
   name: "nexus-cost-control",
-  version: "1.2.1",
+  version: "1.2.2",
   description:
     "Token usage and cost tracking for Nexus sessions. Aggregates token " +
     "counts directly from the runtime's own message data with zero " +
@@ -122,7 +122,7 @@ export const NexusCostControl: Plugin = async (ctx) => {
 
   fileLog("info", "=== nexus-cost-control initializing ===")
   fileLog("info", `Directory: ${directory}`)
-  fileLog("info", nexusConfig ? `Nexus API: ${nexusConfig.apiUrl}` : "WARNING: Nexus credentials not found")
+  fileLog("info", nexusConfig ? `Nexus API: ${nexusConfig.apiUrl} (source: ${nexusConfig.source})` : "WARNING: Nexus credentials not found")
   fileLog(
     "info",
     heliconeConfig ? "Helicone: API key configured" : "WARNING: HELICONE_API_KEY not set — cost tracking disabled",

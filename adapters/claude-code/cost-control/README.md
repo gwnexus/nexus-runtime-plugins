@@ -96,7 +96,21 @@ Add to `.claude/settings.json`:
 
 ## Configuration
 
-`NEXUS_API_URL` and `NEXUS_PRIVATE_TOKEN` are required; `HELICONE_API_KEY`
+Credentials are resolved by `core/nexus-config.ts`, first complete source wins:
+
+1. `NEXUS_API_URL` + `NEXUS_PRIVATE_TOKEN` in the environment
+2. project-local `.nexus/config.toml` (`api_url`) + `.nexus/credentials.toml` (`token`), as written by `nexus link` / `nexus pull`
+3. `.mcp.json` (`mcpServers.nexus.env`)
+4. `opencode.json` (`mcp.nexus.environment`)
+5. global `~/.config/nexus/config.toml` + `credentials.toml`
+
+URL and token always come from the same source. When the project-local
+config sets `api_url`, later sources are used only if they point at that
+same API, so a project linked to a staging hub never posts to production.
+The log names the source (`env`, `project`, `mcp`, `opencode`, `global`),
+never the token.
+
+`HELICONE_API_KEY`
 is optional and enables Helicone enrichment on top of the always-on native
 aggregation:
 

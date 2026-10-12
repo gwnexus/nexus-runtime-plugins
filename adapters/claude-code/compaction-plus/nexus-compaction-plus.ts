@@ -63,7 +63,7 @@ import type { NormalizedToolCall, NexusState } from "../../../core/compaction-pl
 import { resolveProjectRoot } from "../../../core/project-root.ts"
 import { isEntrypoint } from "../../../core/entrypoint.ts"
 
-const PLUGIN_META = { name: "nexus-compaction-plus", version: "1.8.2" } as const
+const PLUGIN_META = { name: "nexus-compaction-plus", version: "1.8.3" } as const
 
 interface ClaudeHookInput {
   cwd?: string
@@ -112,7 +112,8 @@ export function parseClaudeTranscript(transcriptPath: string): NormalizedToolCal
 
     for (const block of content) {
       if (block?.type === "tool_use" && typeof block.name === "string") {
-        pendingById.set(block.id, { tool: block.name, args: block.input ?? {} })
+        // Claude Code names Nexus MCP tools `mcp__nexus__X`; the core expects `nexus_X`.
+        pendingById.set(block.id, { tool: block.name.replace(/^mcp__nexus__/, "nexus_"), args: block.input ?? {} })
       }
       if (block?.type === "tool_result" && block.tool_use_id) {
         const text = Array.isArray(block.content)
@@ -191,6 +192,7 @@ export async function handlePostCompact(
     logger("warn", "No Nexus config — skipping post-compact recording")
     return
   }
+  logger("debug", `Nexus credentials from source "${nexusConfig.source}"`)
 
   let state: NexusState = {}
   if (input.transcript_path) {

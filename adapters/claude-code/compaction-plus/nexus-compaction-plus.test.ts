@@ -43,6 +43,20 @@ describe("compaction-plus Claude Code adapter", () => {
       expect(parseClaudeTranscript("/tmp/does-not-exist.jsonl")).toEqual([])
     })
 
+    it("maps Claude Code's mcp__nexus__X tool names to nexus_X", () => {
+      const lines = [
+        transcriptLine({
+          message: { content: [{ type: "tool_use", id: "c1", name: "mcp__nexus__session_append", input: {} }] },
+        }),
+        transcriptLine({ message: { content: [{ type: "tool_use", id: "c2", name: "mcp__other__x", input: {} }] } }),
+      ]
+      vi.mocked(readFileSync).mockReturnValue(lines.join("\n"))
+      expect(parseClaudeTranscript("/tmp/transcript.jsonl").map((c) => c.tool)).toEqual([
+        "nexus_session_append",
+        "mcp__other__x",
+      ])
+    })
+
     it("pairs tool_use blocks with their tool_result by id", () => {
       const lines = [
         transcriptLine({

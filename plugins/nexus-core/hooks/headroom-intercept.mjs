@@ -679,132 +679,76 @@ var OriginalStore = class {
 };
 
 // core/headroom-intercept/config.ts
-import { existsSync as existsSync4, readFileSync as readFileSync4 } from "node:fs";
+import { existsSync as existsSync4, readFileSync as readFileSync5 } from "node:fs";
+import { join as join5 } from "node:path";
+
+// core/nexus-config.ts
+import { readFileSync as readFileSync4 } from "node:fs";
 import { join as join4 } from "node:path";
-function readMcpJsonNexusCreds(directory) {
-  try {
-    const mcpPath = join4(directory, ".mcp.json");
-    if (!existsSync4(mcpPath)) return {};
-    const raw = readFileSync4(mcpPath, "utf-8");
-    const parsed = JSON.parse(raw);
-    const env = parsed.mcpServers?.nexus?.env ?? {};
-    const apiUrl = typeof env.NEXUS_API_URL === "string" ? env.NEXUS_API_URL : void 0;
-    const token = typeof env.NEXUS_PRIVATE_TOKEN === "string" ? env.NEXUS_PRIVATE_TOKEN : void 0;
-    return { apiUrl, token };
-  } catch {
-    return {};
-  }
-}
-function readProjectLocalTomlCreds(directory) {
-  try {
-    const nexusDir = join4(directory, ".nexus");
-    const configPath = join4(nexusDir, "config.toml");
-    const credsPath = join4(nexusDir, "credentials.toml");
-    let apiUrl;
-    let token;
-    if (existsSync4(configPath)) {
-      const raw = readFileSync4(configPath, "utf-8");
-      const m = raw.match(/api_url\s*=\s*"([^"]+)"/);
-      if (m) apiUrl = m[1];
-    }
-    if (existsSync4(credsPath)) {
-      const raw = readFileSync4(credsPath, "utf-8");
-      const m = raw.match(/^\s*token\s*=\s*"([^"]+)"/m);
-      if (m) token = m[1];
-    }
-    return { apiUrl, token };
-  } catch {
-    return {};
-  }
-}
-function readOpencodeJsonNexusCreds(directory) {
-  try {
-    const ocPath = join4(directory, "opencode.json");
-    if (!existsSync4(ocPath)) return {};
-    const raw = readFileSync4(ocPath, "utf-8");
-    const parsed = JSON.parse(raw);
-    const env = parsed.mcp?.nexus?.environment ?? {};
-    const apiUrl = typeof env.NEXUS_API_URL === "string" ? env.NEXUS_API_URL : void 0;
-    const token = typeof env.NEXUS_PRIVATE_TOKEN === "string" ? env.NEXUS_PRIVATE_TOKEN : void 0;
-    return { apiUrl, token };
-  } catch {
-    return {};
-  }
-}
-function getNexusConfig(directory) {
-  let resolvedUrl = process.env.NEXUS_API_URL;
-  let resolvedToken = process.env.NEXUS_PRIVATE_TOKEN;
-  let source = "env";
-  if (resolvedUrl && resolvedToken) {
-    return { apiUrl: resolvedUrl, token: resolvedToken, source };
-  }
-  const mcpCreds = readMcpJsonNexusCreds(directory);
-  if (!resolvedUrl && mcpCreds.apiUrl) {
-    resolvedUrl = mcpCreds.apiUrl;
-    source = ".mcp.json";
-  }
-  if (!resolvedToken && mcpCreds.token) {
-    resolvedToken = mcpCreds.token;
-    source = ".mcp.json";
-  }
-  if (resolvedUrl && resolvedToken) {
-    return { apiUrl: resolvedUrl, token: resolvedToken, source };
-  }
-  const ocCreds = readOpencodeJsonNexusCreds(directory);
-  if (!resolvedUrl && ocCreds.apiUrl) {
-    resolvedUrl = ocCreds.apiUrl;
-    source = "opencode.json";
-  }
-  if (!resolvedToken && ocCreds.token) {
-    resolvedToken = ocCreds.token;
-    source = "opencode.json";
-  }
-  if (resolvedUrl && resolvedToken) {
-    return { apiUrl: resolvedUrl, token: resolvedToken, source };
-  }
-  const projectCreds = readProjectLocalTomlCreds(directory);
-  if (!resolvedUrl && projectCreds.apiUrl) {
-    resolvedUrl = projectCreds.apiUrl;
-    source = "project-local-config";
-  }
-  if (!resolvedToken && projectCreds.token) {
-    resolvedToken = projectCreds.token;
-    source = "project-local-config";
-  }
-  if (resolvedUrl && resolvedToken) {
-    return { apiUrl: resolvedUrl, token: resolvedToken, source };
-  }
-  try {
-    const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
-    const configDir = join4(home, ".config", "nexus");
-    const configPath = join4(configDir, "config.toml");
-    const credsPath = join4(configDir, "credentials.toml");
-    if (!resolvedUrl && existsSync4(configPath)) {
-      const raw = readFileSync4(configPath, "utf-8");
-      const m = raw.match(/api_url\s*=\s*"([^"]+)"/);
-      if (m) {
-        resolvedUrl = m[1];
-        source = "global-config";
-      }
-    }
-    if (!resolvedToken && existsSync4(credsPath)) {
-      const raw = readFileSync4(credsPath, "utf-8");
-      const m = raw.match(/^\s*token\s*=\s*"([^"]+)"/m);
-      if (m) {
-        resolvedToken = m[1];
-        source = "global-config";
-      }
-    }
-    if (resolvedUrl && resolvedToken) return { apiUrl: resolvedUrl, token: resolvedToken, source };
-  } catch {
+function resolveNexusConfig(directory, env = process.env) {
+  const fromEnv = { apiUrl: nonEmpty(env.NEXUS_API_URL), token: nonEmpty(env.NEXUS_PRIVATE_TOKEN) };
+  if (fromEnv.apiUrl && fromEnv.token) return { apiUrl: fromEnv.apiUrl, token: fromEnv.token, source: "env" };
+  const project = readTomlPair(join4(directory, ".nexus"));
+  const pinnedUrl = project.apiUrl ? normalizeUrl(project.apiUrl) : null;
+  if (project.apiUrl && project.token) return { apiUrl: project.apiUrl, token: project.token, source: "project" };
+  const home = env.HOME ?? env.USERPROFILE ?? "";
+  const later = [
+    ["mcp", () => readJsonEnv(join4(directory, ".mcp.json"), (j) => j?.mcpServers?.nexus?.env)],
+    ["opencode", () => readJsonEnv(join4(directory, "opencode.json"), (j) => j?.mcp?.nexus?.environment)],
+    ["global", () => home ? readTomlPair(join4(home, ".config", "nexus")) : {}]
+  ];
+  for (const [source, read] of later) {
+    const c = read();
+    if (!c.apiUrl || !c.token) continue;
+    if (pinnedUrl && normalizeUrl(c.apiUrl) !== pinnedUrl) continue;
+    return { apiUrl: c.apiUrl, token: c.token, source };
   }
   return null;
 }
+function readTomlPair(dir) {
+  return {
+    apiUrl: readTomlString(join4(dir, "config.toml"), "api_url"),
+    token: readTomlString(join4(dir, "credentials.toml"), "token")
+  };
+}
+function readTomlString(path, key) {
+  try {
+    const m = readFileSync4(path, "utf-8").match(new RegExp(`^\\s*${key}\\s*=\\s*"([^"]+)"`, "m"));
+    return m ? nonEmpty(m[1]) : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function readJsonEnv(path, pick) {
+  try {
+    const block = pick(JSON.parse(readFileSync4(path, "utf-8")));
+    if (typeof block !== "object" || block === null) return {};
+    const e = block;
+    return {
+      apiUrl: typeof e.NEXUS_API_URL === "string" ? nonEmpty(e.NEXUS_API_URL) : void 0,
+      token: typeof e.NEXUS_PRIVATE_TOKEN === "string" ? nonEmpty(e.NEXUS_PRIVATE_TOKEN) : void 0
+    };
+  } catch {
+    return {};
+  }
+}
+function nonEmpty(v) {
+  const t = v?.trim();
+  return t && !t.startsWith("${") ? t : void 0;
+}
+function normalizeUrl(url) {
+  return url.trim().replace(/\/+$/, "").toLowerCase();
+}
+
+// core/headroom-intercept/config.ts
+function getNexusConfig(directory) {
+  return resolveNexusConfig(directory);
+}
 function readProjectIdFromAgentsMd(directory) {
   try {
-    const agentsPath = join4(directory, ".nexus", "AGENTS.md");
+    const agentsPath = join5(directory, ".nexus", "AGENTS.md");
     if (!existsSync4(agentsPath)) return null;
-    const raw = readFileSync4(agentsPath, "utf-8");
+    const raw = readFileSync5(agentsPath, "utf-8");
     const fmMatch = raw.match(/^---\s*\n([\s\S]*?)\n---/);
     if (!fmMatch) return null;
     const pidMatch = fmMatch[1].match(/project_id:\s*([0-9a-f-]{36})/);
@@ -1113,7 +1057,7 @@ function isEntrypoint(moduleUrl, argv1 = process.argv[1]) {
 }
 
 // adapters/claude-code/headroom-intercept/nexus-headroom-intercept.ts
-var PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.18" };
+var PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.19" };
 var DEFAULT_MODE = "observe";
 var DEBUG = process.env.HEADROOM_DEBUG === "true";
 var GATE_STATE_FILE = "headroom-gate-state.json";

@@ -35,36 +35,67 @@ function rotateIfNeeded(path, maxBytes) {
   }
 }
 
-// core/compaction-plus/config.ts
+// core/nexus-config.ts
 import { readFileSync } from "node:fs";
 import { join as join2 } from "node:path";
-function getNexusConfig(_directory) {
-  const apiUrl = process.env.NEXUS_API_URL;
-  const token = process.env.NEXUS_PRIVATE_TOKEN;
-  if (apiUrl && token) return { apiUrl, token };
-  try {
-    const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
-    const nexusConfigDir = join2(home, ".config", "nexus");
-    let resolvedApiUrl;
-    try {
-      const configRaw = readFileSync(join2(nexusConfigDir, "config.toml"), "utf-8");
-      const apiMatch = configRaw.match(/^\s*api_url\s*=\s*"([^"]+)"/m);
-      if (apiMatch) resolvedApiUrl = apiMatch[1];
-    } catch {
-    }
-    let resolvedToken;
-    try {
-      const credsRaw = readFileSync(join2(nexusConfigDir, "credentials.toml"), "utf-8");
-      const tokenMatch = credsRaw.match(/^\s*token\s*=\s*"([^"]+)"/m);
-      if (tokenMatch) resolvedToken = tokenMatch[1];
-    } catch {
-    }
-    if (resolvedApiUrl && resolvedToken) {
-      return { apiUrl: resolvedApiUrl, token: resolvedToken };
-    }
-  } catch {
+function resolveNexusConfig(directory, env = process.env) {
+  const fromEnv = { apiUrl: nonEmpty(env.NEXUS_API_URL), token: nonEmpty(env.NEXUS_PRIVATE_TOKEN) };
+  if (fromEnv.apiUrl && fromEnv.token) return { apiUrl: fromEnv.apiUrl, token: fromEnv.token, source: "env" };
+  const project = readTomlPair(join2(directory, ".nexus"));
+  const pinnedUrl = project.apiUrl ? normalizeUrl(project.apiUrl) : null;
+  if (project.apiUrl && project.token) return { apiUrl: project.apiUrl, token: project.token, source: "project" };
+  const home = env.HOME ?? env.USERPROFILE ?? "";
+  const later = [
+    ["mcp", () => readJsonEnv(join2(directory, ".mcp.json"), (j) => j?.mcpServers?.nexus?.env)],
+    ["opencode", () => readJsonEnv(join2(directory, "opencode.json"), (j) => j?.mcp?.nexus?.environment)],
+    ["global", () => home ? readTomlPair(join2(home, ".config", "nexus")) : {}]
+  ];
+  for (const [source, read] of later) {
+    const c = read();
+    if (!c.apiUrl || !c.token) continue;
+    if (pinnedUrl && normalizeUrl(c.apiUrl) !== pinnedUrl) continue;
+    return { apiUrl: c.apiUrl, token: c.token, source };
   }
   return null;
+}
+function readTomlPair(dir) {
+  return {
+    apiUrl: readTomlString(join2(dir, "config.toml"), "api_url"),
+    token: readTomlString(join2(dir, "credentials.toml"), "token")
+  };
+}
+function readTomlString(path, key) {
+  try {
+    const m = readFileSync(path, "utf-8").match(new RegExp(`^\\s*${key}\\s*=\\s*"([^"]+)"`, "m"));
+    return m ? nonEmpty(m[1]) : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function readJsonEnv(path, pick) {
+  try {
+    const block = pick(JSON.parse(readFileSync(path, "utf-8")));
+    if (typeof block !== "object" || block === null) return {};
+    const e = block;
+    return {
+      apiUrl: typeof e.NEXUS_API_URL === "string" ? nonEmpty(e.NEXUS_API_URL) : void 0,
+      token: typeof e.NEXUS_PRIVATE_TOKEN === "string" ? nonEmpty(e.NEXUS_PRIVATE_TOKEN) : void 0
+    };
+  } catch {
+    return {};
+  }
+}
+function nonEmpty(v) {
+  const t = v?.trim();
+  return t && !t.startsWith("${") ? t : void 0;
+}
+function normalizeUrl(url) {
+  return url.trim().replace(/\/+$/, "").toLowerCase();
+}
+
+// core/compaction-plus/config.ts
+function getNexusConfig(directory) {
+  return resolveNexusConfig(directory);
 }
 
 // core/compaction-plus/state.ts
@@ -189,7 +220,7 @@ function isEntrypoint(moduleUrl, argv1 = process.argv[1]) {
 }
 
 // adapters/claude-code/compaction-plus/nexus-compaction-plus.ts
-var PLUGIN_META = { name: "nexus-compaction-plus", version: "1.8.2" };
+var PLUGIN_META = { name: "nexus-compaction-plus", version: "1.8.3" };
 function parseClaudeTranscript(transcriptPath) {
   const calls = [];
   if (!existsSync(transcriptPath)) return calls;
@@ -213,7 +244,7 @@ function parseClaudeTranscript(transcriptPath) {
     if (!Array.isArray(content)) continue;
     for (const block of content) {
       if (block?.type === "tool_use" && typeof block.name === "string") {
-        pendingById.set(block.id, { tool: block.name, args: block.input ?? {} });
+        pendingById.set(block.id, { tool: block.name.replace(/^mcp__nexus__/, "nexus_"), args: block.input ?? {} });
       }
       if (block?.type === "tool_result" && block.tool_use_id) {
         const text = Array.isArray(block.content) ? block.content.find((c) => c?.type === "text")?.text : typeof block.content === "string" ? block.content : void 0;
@@ -263,6 +294,7 @@ async function handlePostCompact(input, logger) {
     logger("warn", "No Nexus config \u2014 skipping post-compact recording");
     return;
   }
+  logger("debug", `Nexus credentials from source "${nexusConfig.source}"`);
   let state = {};
   if (input.transcript_path) {
     const calls = parseClaudeTranscript(input.transcript_path);
