@@ -125,6 +125,18 @@ function hasGitEntry(dir) {
   }
 }
 
+// core/entrypoint.ts
+import { realpathSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+function isEntrypoint(moduleUrl, argv1 = process.argv[1]) {
+  if (!argv1) return false;
+  try {
+    return moduleUrl === pathToFileURL(realpathSync(argv1)).href;
+  } catch {
+    return false;
+  }
+}
+
 // adapters/claude-code/routing-guard/nexus-routing-guard.ts
 var PLUGIN_META = { name: "nexus-routing-guard", version: "1.0.1" };
 var ENV_ENABLED = "NEXUS_ROUTING_GUARD_ENABLED";
@@ -219,7 +231,7 @@ async function main() {
   fileLog("warn", `Unknown mode "${mode}" (expected session-start) \u2014 no-op`);
   process.exit(0);
 }
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isEntrypoint(import.meta.url)) {
   main().catch((err) => {
     process.stderr.write(`[${PLUGIN_META.name}] error: ${err}
 `);

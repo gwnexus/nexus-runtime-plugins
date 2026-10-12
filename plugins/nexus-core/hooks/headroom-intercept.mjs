@@ -1100,6 +1100,18 @@ function hasGitEntry(dir) {
   }
 }
 
+// core/entrypoint.ts
+import { realpathSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+function isEntrypoint(moduleUrl, argv1 = process.argv[1]) {
+  if (!argv1) return false;
+  try {
+    return moduleUrl === pathToFileURL(realpathSync(argv1)).href;
+  } catch {
+    return false;
+  }
+}
+
 // adapters/claude-code/headroom-intercept/nexus-headroom-intercept.ts
 var PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.18" };
 var DEFAULT_MODE = "observe";
@@ -1337,7 +1349,7 @@ async function main() {
   logger.log("warn", "unknown_mode", { mode });
   process.exit(0);
 }
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isEntrypoint(import.meta.url)) {
   main().catch((err) => {
     process.stderr.write(`[${PLUGIN_META.name}] error: ${err}
 `);

@@ -36,6 +36,7 @@ import { readUsageIncrement } from "../../../core/agent-observer/transcript.ts"
 import { loadObserverState, saveObserverState, withObserverLock } from "../../../core/agent-observer/state.ts"
 import { appendRecords } from "../../../core/agent-observer/writer.ts"
 import { PLUGIN_META, type ObserverHookInput } from "../../../core/agent-observer/types.ts"
+import { isEntrypoint } from "../../../core/entrypoint.ts"
 
 /**
  * `<agentic_root>/claude/observer`. The agentic root defaults to
@@ -63,12 +64,13 @@ export function handleHookPayload(
   if (!existsSync(agenticRoot)) return false
 
   const repo = resolveRepoInfo(typeof input.cwd === "string" ? input.cwd : null)
-  return withObserverLock(observerDir, () => {
+  return withObserverLock(observerDir, (locked) => {
     const state = loadObserverState(observerDir)
     const ctx: ObserveContext = { now, repo, readUsage: readUsageIncrement }
     const record = observe(input, state, ctx)
     if (!record) return false
-    saveObserverState(observerDir, state, now.getTime())
+    // Without the lock the loaded state may be stale; saving it would drop another process's update.
+    if (locked) saveObserverState(observerDir, state, now.getTime())
     return appendRecords(observerDir, [record])
   })
 }
@@ -91,7 +93,7 @@ async function main(): Promise<void> {
 }
 
 // Only run the CLI entrypoint when executed directly, not when imported by tests.
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isEntrypoint(import.meta.url)) {
   main().catch((err) => {
     process.stderr.write(`[${PLUGIN_META.name}] error: ${err}\n`)
     process.exit(0)

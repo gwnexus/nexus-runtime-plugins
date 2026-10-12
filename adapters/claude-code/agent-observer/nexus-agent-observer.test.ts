@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
-import { mkdtempSync, mkdirSync, readFileSync, existsSync, rmSync } from "node:fs"
+import { mkdtempSync, mkdirSync, readFileSync, existsSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { spawn } from "node:child_process"
 import { join } from "node:path"
@@ -460,6 +460,19 @@ describe("agent-observer: adapter I/O", () => {
     )
     expect(readFileSync(join(dir, ".nexus/claude/observer/events.jsonl"), "utf-8").trim().split("\n")).toHaveLength(n)
     expect(existsSync(join(dir, ".nexus/claude/observer/state.lock"))).toBe(false)
+  })
+
+  it("appends the record but does not save state when the lock is not acquired", () => {
+    const observerDir = join(dir, ".nexus/claude/observer")
+    mkdirSync(observerDir, { recursive: true })
+    writeFileSync(join(observerDir, "state.lock"), "") // fresh lock held by another process
+    const wrote = handleHookPayload(
+      { hook_event_name: "SessionStart", session_id: "s", cwd: dir },
+      { CLAUDE_PROJECT_DIR: dir },
+    )
+    expect(wrote).toBe(true)
+    expect(readFileSync(join(observerDir, "events.jsonl"), "utf-8").trim().split("\n")).toHaveLength(1)
+    expect(existsSync(join(observerDir, "state.json"))).toBe(false)
   })
 
   it("exits 0 on malformed stdin (built bundle)", async () => {

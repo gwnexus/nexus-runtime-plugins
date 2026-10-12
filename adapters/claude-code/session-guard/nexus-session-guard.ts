@@ -60,6 +60,7 @@ import {
   type SessionGuardState,
 } from "../../../core/session-guard/logic.ts"
 import { resolveProjectRoot } from "../../../core/project-root.ts"
+import { isEntrypoint } from "../../../core/entrypoint.ts"
 
 export const STATE_FILE = "session-guard-state.json"
 
@@ -173,7 +174,7 @@ async function main(): Promise<void> {
 }
 
 // Only run the CLI entrypoint when executed directly, not when imported by tests.
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isEntrypoint(import.meta.url)) {
   main().catch((err) => {
     // Never crash/block on adapter errors — fail open.
     process.stderr.write(`[${PLUGIN_META.name}] error: ${err}\n`)

@@ -59,6 +59,7 @@ import { appendCostEntry } from "../../../core/cost-control/api.ts"
 import { emptyRuntimeUsage, buildRuntimeCostEntry, type RuntimeUsage } from "../../../core/cost-control/runtime-usage.ts"
 import type { NormalizedToolCall } from "../../../core/cost-control/types.ts"
 import { resolveProjectRoot } from "../../../core/project-root.ts"
+import { isEntrypoint } from "../../../core/entrypoint.ts"
 
 const PLUGIN_META = { name: "nexus-cost-control", version: "1.2.1" } as const
 const STATE_FILE = "cost-control-state.json"
@@ -292,7 +293,7 @@ async function main(): Promise<void> {
   process.exit(0)
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isEntrypoint(import.meta.url)) {
   main().catch((err) => {
     process.stderr.write(`[${PLUGIN_META.name}] error: ${err}\n`)
     process.exit(0)

@@ -22,8 +22,8 @@ export const STATE_TTL_MS = 24 * 60 * 60 * 1000
 export const MAX_PENDING = 50
 
 export const LOCK_FILE = "state.lock"
-/** Give up waiting for the lock after this long and run unlocked (best effort). */
-export const LOCK_WAIT_MS = 50
+/** Give up waiting for the lock after this long and run without it. */
+export const LOCK_WAIT_MS = 1000
 /** A lock older than this is considered abandoned by a crashed hook. */
 export const LOCK_STALE_MS = 2000
 
@@ -32,10 +32,11 @@ const sleepCell = new Int32Array(new SharedArrayBuffer(4))
 /**
  * Run `fn` holding an exclusive `O_EXCL` lock file in `observerDir`. Never
  * throws for lock problems and never waits longer than `LOCK_WAIT_MS`: if the
- * lock cannot be taken, `fn` runs anyway (a rare lost update beats blocking
- * Claude Code).
+ * lock cannot be taken, `fn` runs anyway with `locked = false`, and the caller
+ * must not save state then (its load may be stale, so a save would overwrite
+ * another process's update). Appending the event record is still safe.
  */
-export function withObserverLock<T>(observerDir: string, fn: () => T): T {
+export function withObserverLock<T>(observerDir: string, fn: (locked: boolean) => T): T {
   const lockPath = join(observerDir, LOCK_FILE)
   let fd: number | null = null
   try {
@@ -62,7 +63,7 @@ export function withObserverLock<T>(observerDir: string, fn: () => T): T {
     // unusable directory -- run unlocked
   }
   try {
-    return fn()
+    return fn(fd !== null)
   } finally {
     if (fd !== null) {
       try {

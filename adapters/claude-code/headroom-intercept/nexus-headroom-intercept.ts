@@ -98,6 +98,7 @@ import type { PluginMode, SessionMetrics } from "../../../core/headroom-intercep
 import { wrapRetrievedContent } from "../../../core/headroom-intercept/compression.ts"
 import { intercept, commitTransformed, commitTransformFailed } from "../../../core/headroom-intercept/engine.ts"
 import { resolveProjectRoot } from "../../../core/project-root.ts"
+import { isEntrypoint } from "../../../core/entrypoint.ts"
 
 const PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.18" } as const
 
@@ -443,7 +444,7 @@ async function main(): Promise<void> {
   process.exit(0)
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isEntrypoint(import.meta.url)) {
   main().catch((err) => {
     process.stderr.write(`[${PLUGIN_META.name}] error: ${err}\n`)
     process.exit(0)

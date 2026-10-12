@@ -425,7 +425,7 @@ var STATE_FILE = "state.json";
 var STATE_TTL_MS = 24 * 60 * 60 * 1e3;
 var MAX_PENDING = 50;
 var LOCK_FILE = "state.lock";
-var LOCK_WAIT_MS = 50;
+var LOCK_WAIT_MS = 1e3;
 var LOCK_STALE_MS = 2e3;
 var sleepCell = new Int32Array(new SharedArrayBuffer(4));
 function withObserverLock(observerDir, fn) {
@@ -453,7 +453,7 @@ function withObserverLock(observerDir, fn) {
   } catch {
   }
   try {
-    return fn();
+    return fn(fd !== null);
   } finally {
     if (fd !== null) {
       try {
@@ -541,6 +541,18 @@ function rotateIfNeeded(observerDir, path, maxBytes) {
   renameSync2(path, join2(observerDir, ROTATED_FILE));
 }
 
+// core/entrypoint.ts
+import { realpathSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+function isEntrypoint(moduleUrl, argv1 = process.argv[1]) {
+  if (!argv1) return false;
+  try {
+    return moduleUrl === pathToFileURL(realpathSync(argv1)).href;
+  } catch {
+    return false;
+  }
+}
+
 // adapters/claude-code/agent-observer/nexus-agent-observer.ts
 function resolveObserverDir(env, input) {
   const projectDir = resolveProjectRoot(typeof input.cwd === "string" ? input.cwd : null, env);
@@ -555,12 +567,12 @@ function handleHookPayload(input, env = process.env, now = /* @__PURE__ */ new D
   const agenticRoot = resolve3(observerDir, "..", "..");
   if (!existsSync(agenticRoot)) return false;
   const repo = resolveRepoInfo(typeof input.cwd === "string" ? input.cwd : null);
-  return withObserverLock(observerDir, () => {
+  return withObserverLock(observerDir, (locked) => {
     const state = loadObserverState(observerDir);
     const ctx = { now, repo, readUsage: readUsageIncrement };
     const record = observe(input, state, ctx);
     if (!record) return false;
-    saveObserverState(observerDir, state, now.getTime());
+    if (locked) saveObserverState(observerDir, state, now.getTime());
     return appendRecords(observerDir, [record]);
   });
 }
@@ -579,7 +591,7 @@ async function main() {
   handleHookPayload(input);
   process.exit(0);
 }
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isEntrypoint(import.meta.url)) {
   main().catch((err) => {
     process.stderr.write(`[${PLUGIN_META.name}] error: ${err}
 `);

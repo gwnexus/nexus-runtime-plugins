@@ -176,6 +176,18 @@ function hasGitEntry(dir) {
   }
 }
 
+// core/entrypoint.ts
+import { realpathSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+function isEntrypoint(moduleUrl, argv1 = process.argv[1]) {
+  if (!argv1) return false;
+  try {
+    return moduleUrl === pathToFileURL(realpathSync(argv1)).href;
+  } catch {
+    return false;
+  }
+}
+
 // adapters/claude-code/compaction-plus/nexus-compaction-plus.ts
 var PLUGIN_META = { name: "nexus-compaction-plus", version: "1.8.2" };
 function parseClaudeTranscript(transcriptPath) {
@@ -295,7 +307,7 @@ async function main() {
   fileLog("warn", `Unknown mode "${mode}" (expected pre-compact|post-compact) \u2014 no-op`);
   process.exit(0);
 }
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isEntrypoint(import.meta.url)) {
   main().catch((err) => {
     process.stderr.write(`[${PLUGIN_META.name}] error: ${err}
 `);

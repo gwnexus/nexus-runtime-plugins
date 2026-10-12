@@ -61,6 +61,7 @@ import { extractNexusState, cleanCompactedText, buildCompactionSummary } from ".
 import { appendCompactionEntry } from "../../../core/compaction-plus/api.ts"
 import type { NormalizedToolCall, NexusState } from "../../../core/compaction-plus/types.ts"
 import { resolveProjectRoot } from "../../../core/project-root.ts"
+import { isEntrypoint } from "../../../core/entrypoint.ts"
 
 const PLUGIN_META = { name: "nexus-compaction-plus", version: "1.8.2" } as const
 
@@ -247,7 +248,7 @@ async function main(): Promise<void> {
   process.exit(0)
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isEntrypoint(import.meta.url)) {
   main().catch((err) => {
     process.stderr.write(`[${PLUGIN_META.name}] error: ${err}\n`)
     process.exit(0)

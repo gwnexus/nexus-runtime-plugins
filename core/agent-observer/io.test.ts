@@ -17,6 +17,7 @@ import { appendRecords, EVENTS_FILE, ROTATED_FILE } from "./writer.ts"
 import {
   LOCK_FILE,
   LOCK_STALE_MS,
+  LOCK_WAIT_MS,
   loadObserverState,
   pruneState,
   saveObserverState,
@@ -196,6 +197,7 @@ describe("withObserverLock", () => {
   it("holds the lock during fn and releases it afterwards, even on throw", () => {
     expect(withObserverLock(dir, () => existsSync(join(dir, LOCK_FILE)))).toBe(true)
     expect(existsSync(join(dir, LOCK_FILE))).toBe(false)
+    expect(withObserverLock(dir, (locked) => locked)).toBe(true)
     expect(() =>
       withObserverLock(dir, () => {
         throw new Error("x")
@@ -212,11 +214,13 @@ describe("withObserverLock", () => {
     expect(existsSync(join(dir, LOCK_FILE))).toBe(false)
   })
 
-  it("runs unlocked after the wait budget when a fresh lock is held", () => {
+  it("runs with locked = false after the wait budget when a fresh lock is held", () => {
     writeFileSync(join(dir, LOCK_FILE), "")
     const start = Date.now()
-    expect(withObserverLock(dir, () => "ran")).toBe("ran")
-    expect(Date.now() - start).toBeLessThan(500)
+    expect(withObserverLock(dir, (locked) => locked)).toBe(false)
+    const waited = Date.now() - start
+    expect(waited).toBeGreaterThanOrEqual(LOCK_WAIT_MS - 10)
+    expect(waited).toBeLessThan(LOCK_WAIT_MS + 1000)
     expect(existsSync(join(dir, LOCK_FILE))).toBe(true) // foreign lock left untouched
   })
 })
