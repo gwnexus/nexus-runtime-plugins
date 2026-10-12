@@ -3,7 +3,7 @@
 An [OpenCode](https://opencode.ai) plugin that enforces session append discipline
 for the [Nexus](https://nexus.gatewarden.eu) platform.
 
-**Current version:** `v1.1.4`  
+**Current version:** `v1.2.0`  
 **Requires:** Nexus MCP server (active session)
 
 ## What it does
@@ -37,6 +37,25 @@ Agent calls nexus_session_append → lastAppendTurnIndex = lastUserTurnIndex
 
 - **`tool.execute.after`** — detects trigger tools and injects reminders
 - **`event`** (`message.created`) — tracks user turn index
+- **Release-line nudge** — checked once when the plugin loads; OpenCode has
+  no session-start context injection, so the nudge is appended once to the
+  first tool output (see below)
+
+## Release-line nudge
+
+Projects that keep one Nexus session per release line title it
+`staging/release-X.Y.Z: <focus>`. At session start the guard reads the
+current branch of the project root (`.git/HEAD`, no subprocess). Only on a
+`staging/release-X.Y.Z` branch it fetches the project's open Nexus sessions
+(`session_list` via the Nexus REST API, 3 s timeout) and, when no open
+session title starts with the branch name, injects one line asking the
+agent to close the old session with a summary (`/nexus-session-close`) and
+start `staging/release-X.Y.Z: <focus>` (`/nexus-init`). The guard never
+closes or creates sessions itself. Not a git checkout, detached HEAD, other
+branches, missing credentials or project id (`NEXUS_PROJECT_ID` or the
+`project_id` in `.nexus/AGENTS.md`), or a failed lookup: no nudge.
+
+Disable with `NEXUS_SESSION_GUARD_RELEASE_NUDGE=off` (default on).
 
 ## Installation
 

@@ -79,6 +79,15 @@
         ]
       },
       {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/hooks/session-guard.mjs session-start"
+          }
+        ]
+      },
+      {
         "hooks": [
           {
             "type": "command",

@@ -7,6 +7,8 @@ import {
   evaluateToolCompletion,
   REMINDER_MESSAGE,
 } from "../../../core/session-guard/logic.ts"
+import { checkReleaseLine } from "../../../core/session-guard/release-line.ts"
+import { findGitTopLevel } from "../../../core/project-root.ts"
 
 /**
  * Nexus Session Guard — OpenCode adapter (ADR-C05).
@@ -16,7 +18,10 @@ import {
  * plugin instance is long-lived for the duration of the session.
  *
  * Hooks:
- *   - tool.execute.after — core detection + reminder injection
+ *   - tool.execute.after — core detection + reminder injection; also
+ *     appends the release-line nudge (core/session-guard/release-line.ts)
+ *     once to the first tool output, since OpenCode has no session-start
+ *     context injection. The check runs once when the plugin loads.
  *   - event (message.updated, role=user) — user turn tracking
  */
 export const NexusSessionGuard: Plugin = async (ctx) => {
@@ -24,6 +29,8 @@ export const NexusSessionGuard: Plugin = async (ctx) => {
   const fileLog = createFileLogger(directory, "session-guard.log")
   const state = initialState()
   let _lastSeenUserMsgId: string | null = null
+  const releaseCheck = checkReleaseLine(findGitTopLevel(directory) ?? directory).catch(() => null)
+  let releaseNudgeDelivered = false
 
   fileLog("info", "=== Plugin initializing ===")
   fileLog("info", `Directory: ${directory}`)
@@ -38,6 +45,15 @@ export const NexusSessionGuard: Plugin = async (ctx) => {
 
   return {
     "tool.execute.after": async (input, output) => {
+      if (!releaseNudgeDelivered) {
+        releaseNudgeDelivered = true
+        const release = await releaseCheck
+        if (release?.action === "nudge") {
+          fileLog("info", `Release-line nudge: ${release.message}`)
+          appendToToolOutput(output as Record<string, unknown>, release.message)
+        }
+      }
+
       const toolName = String(input?.tool ?? "")
       const args = (input as Record<string, unknown>) ?? {}
       const result = evaluateToolCompletion(state, toolName, args)
@@ -83,15 +99,7 @@ export const NexusSessionGuard: Plugin = async (ctx) => {
         },
       })
 
-      const raw = output as Record<string, unknown>
-      if (typeof raw.output === "string") {
-        raw.output = raw.output + "\n\n" + REMINDER_MESSAGE
-      } else if (Array.isArray(raw.content)) {
-        raw.content.push({
-          type: "text",
-          text: "\n\n" + REMINDER_MESSAGE,
-        })
-      }
+      appendToToolOutput(output as Record<string, unknown>, REMINDER_MESSAGE)
     },
 
     event: async ({ event }) => {
@@ -117,5 +125,16 @@ export const NexusSessionGuard: Plugin = async (ctx) => {
         }
       }
     },
+  }
+}
+
+function appendToToolOutput(raw: Record<string, unknown>, text: string): void {
+  if (typeof raw.output === "string") {
+    raw.output = raw.output + "\n\n" + text
+  } else if (Array.isArray(raw.content)) {
+    raw.content.push({
+      type: "text",
+      text: "\n\n" + text,
+    })
   }
 }

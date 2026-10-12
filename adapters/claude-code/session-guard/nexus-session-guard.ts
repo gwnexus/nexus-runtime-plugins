@@ -33,10 +33,19 @@
  * headroom-intercept adapter (kept local to this adapter; core stays
  * runtime-neutral).
  *
+ * Release-line nudge: on `SessionStart` (mode `session-start`), when the
+ * project root is on a `staging/release-X.Y.Z` branch and no open Nexus
+ * session title starts with that branch name, one additional-context line
+ * asks the agent to switch sessions (core/session-guard/release-line.ts).
+ * Disable with NEXUS_SESSION_GUARD_RELEASE_NUDGE=off.
+ *
  * Hook configuration (.claude/settings.json):
  *
  *   {
  *     "hooks": {
+ *       "SessionStart": [
+ *         { "matcher": "startup|resume|clear", "hooks": [{ "type": "command", "command": "node adapters/claude-code/session-guard/nexus-session-guard.ts session-start" }] }
+ *       ],
  *       "UserPromptSubmit": [
  *         { "hooks": [{ "type": "command", "command": "node adapters/claude-code/session-guard/nexus-session-guard.ts user-prompt-submit" }] }
  *       ],
@@ -59,6 +68,8 @@ import {
   REMINDER_MESSAGE,
   type SessionGuardState,
 } from "../../../core/session-guard/logic.ts"
+import { checkReleaseLine, type OpenSession } from "../../../core/session-guard/release-line.ts"
+import type { NexusConfig } from "../../../core/headroom-intercept/types.ts"
 import { resolveProjectRoot } from "../../../core/project-root.ts"
 import { isEntrypoint } from "../../../core/entrypoint.ts"
 
@@ -72,7 +83,7 @@ export interface ClaudeHookInput {
   tool_response?: unknown
 }
 
-export type HookMode = "user-prompt-submit" | "post-tool-use"
+export type HookMode = "session-start" | "user-prompt-submit" | "post-tool-use"
 
 /**
  * Normalize Claude Code's MCP tool name into the core logic's naming
@@ -135,8 +146,36 @@ export function handleHookEvent(
     }
   }
 
-  fileLog("warn", `Unknown mode "${mode}" (expected user-prompt-submit|post-tool-use) — no-op`)
+  fileLog("warn", `Unknown mode "${mode}" (expected session-start|user-prompt-submit|post-tool-use) — no-op`)
   return null
+}
+
+/**
+ * `session-start` mode: release-line nudge. `directory` is the project root.
+ * Returns the hook output when a nudge is due, otherwise null.
+ */
+export async function handleSessionStart(
+  directory: string,
+  fileLog: (level: string, message: string) => void,
+  env: NodeJS.ProcessEnv = process.env,
+  lookup?: (config: NexusConfig, projectId: string) => Promise<OpenSession[] | null>,
+): Promise<Record<string, unknown> | null> {
+  const result = await checkReleaseLine(directory, env, lookup)
+  if (!result) {
+    fileLog("debug", "Release-line nudge disabled")
+    return null
+  }
+  if (result.action !== "nudge") {
+    fileLog("debug", `Release-line check: ${result.action === "skip" ? result.reason : "in_line"}`)
+    return null
+  }
+  fileLog("info", `Release-line nudge: ${result.message}`)
+  return {
+    hookSpecificOutput: {
+      hookEventName: "SessionStart",
+      additionalContext: result.message,
+    },
+  }
 }
 
 async function readStdin(): Promise<string> {
@@ -165,7 +204,8 @@ async function main(): Promise<void> {
   if (!directory) process.exit(0)
   input = { ...input, cwd: directory }
   const fileLog = createFileLogger(directory, "session-guard.log")
-  const output = handleHookEvent(mode, input, fileLog)
+  const output =
+    mode === "session-start" ? await handleSessionStart(directory, fileLog) : handleHookEvent(mode, input, fileLog)
 
   if (output) {
     process.stdout.write(JSON.stringify(output))

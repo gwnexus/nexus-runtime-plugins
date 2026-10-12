@@ -15,6 +15,11 @@ vi.mock("node:fs", async () => {
   }
 })
 
+const release = vi.hoisted(() => ({ result: null as unknown }))
+vi.mock("../../../core/session-guard/release-line.ts", () => ({
+  checkReleaseLine: vi.fn(async () => release.result),
+}))
+
 import { NexusSessionGuard } from "./nexus-session-guard.ts"
 
 function makeClient() {
@@ -45,6 +50,7 @@ describe("NexusSessionGuard", () => {
 
   beforeEach(async () => {
     _msgCounter = 0
+    release.result = null
     client = makeClient()
     hooks = await NexusSessionGuard({ client, directory: "/tmp/test-project" } as any)
   })
@@ -258,6 +264,27 @@ describe("NexusSessionGuard", () => {
       const output = { output: "edit" }
       await hooks["tool.execute.after"]({ tool: "Edit" }, output)
       expect(output.output).toBe("edit")
+    })
+  })
+
+  describe("release-line nudge", () => {
+    it("appends the nudge once, to the first tool output only", async () => {
+      release.result = { action: "nudge", message: "[nexus-session-guard] Branch staging/release-0.18.0 ..." }
+      hooks = await NexusSessionGuard({ client, directory: "/tmp/test-project" } as any)
+      const first: any = { output: "r1" }
+      await hooks["tool.execute.after"]({ tool: "Read" }, first)
+      expect(first.output).toBe("r1\n\n[nexus-session-guard] Branch staging/release-0.18.0 ...")
+      const second: any = { content: [{ type: "text", text: "r2" }] }
+      await hooks["tool.execute.after"]({ tool: "Read" }, second)
+      expect(second.content).toHaveLength(1)
+    })
+
+    it("leaves the output alone when no nudge is due", async () => {
+      release.result = { action: "in_line" }
+      hooks = await NexusSessionGuard({ client, directory: "/tmp/test-project" } as any)
+      const out: any = { output: "r1" }
+      await hooks["tool.execute.after"]({ tool: "Read" }, out)
+      expect(out.output).toBe("r1")
     })
   })
 })

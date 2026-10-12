@@ -64,7 +64,7 @@ function saveState(directory, fileName, state) {
 // core/session-guard/logic.ts
 var PLUGIN_META = {
   name: "nexus-session-guard",
-  version: "1.1.4",
+  version: "1.2.0",
   description: "Detects code-changing tool completions and reminds the agent to call nexus_session_append before proceeding."
 };
 var DEFAULT_TRIGGER_TOOLS = /* @__PURE__ */ new Set(["Edit", "Write", "MultiEdit"]);
@@ -136,16 +136,227 @@ function evaluateToolCompletion(state, toolName, input) {
   return { action: "remind" };
 }
 
+// core/session-guard/release-line.ts
+import { readFileSync as readFileSync3, statSync as statSync2 } from "node:fs";
+import { isAbsolute, join as join4, resolve } from "node:path";
+
+// core/headroom-intercept/config.ts
+import { existsSync as existsSync2, readFileSync as readFileSync2 } from "node:fs";
+import { join as join3 } from "node:path";
+function readMcpJsonNexusCreds(directory) {
+  try {
+    const mcpPath = join3(directory, ".mcp.json");
+    if (!existsSync2(mcpPath)) return {};
+    const raw = readFileSync2(mcpPath, "utf-8");
+    const parsed = JSON.parse(raw);
+    const env = parsed.mcpServers?.nexus?.env ?? {};
+    const apiUrl = typeof env.NEXUS_API_URL === "string" ? env.NEXUS_API_URL : void 0;
+    const token = typeof env.NEXUS_PRIVATE_TOKEN === "string" ? env.NEXUS_PRIVATE_TOKEN : void 0;
+    return { apiUrl, token };
+  } catch {
+    return {};
+  }
+}
+function readProjectLocalTomlCreds(directory) {
+  try {
+    const nexusDir = join3(directory, ".nexus");
+    const configPath = join3(nexusDir, "config.toml");
+    const credsPath = join3(nexusDir, "credentials.toml");
+    let apiUrl;
+    let token;
+    if (existsSync2(configPath)) {
+      const raw = readFileSync2(configPath, "utf-8");
+      const m = raw.match(/api_url\s*=\s*"([^"]+)"/);
+      if (m) apiUrl = m[1];
+    }
+    if (existsSync2(credsPath)) {
+      const raw = readFileSync2(credsPath, "utf-8");
+      const m = raw.match(/^\s*token\s*=\s*"([^"]+)"/m);
+      if (m) token = m[1];
+    }
+    return { apiUrl, token };
+  } catch {
+    return {};
+  }
+}
+function readOpencodeJsonNexusCreds(directory) {
+  try {
+    const ocPath = join3(directory, "opencode.json");
+    if (!existsSync2(ocPath)) return {};
+    const raw = readFileSync2(ocPath, "utf-8");
+    const parsed = JSON.parse(raw);
+    const env = parsed.mcp?.nexus?.environment ?? {};
+    const apiUrl = typeof env.NEXUS_API_URL === "string" ? env.NEXUS_API_URL : void 0;
+    const token = typeof env.NEXUS_PRIVATE_TOKEN === "string" ? env.NEXUS_PRIVATE_TOKEN : void 0;
+    return { apiUrl, token };
+  } catch {
+    return {};
+  }
+}
+function getNexusConfig(directory) {
+  let resolvedUrl = process.env.NEXUS_API_URL;
+  let resolvedToken = process.env.NEXUS_PRIVATE_TOKEN;
+  let source = "env";
+  if (resolvedUrl && resolvedToken) {
+    return { apiUrl: resolvedUrl, token: resolvedToken, source };
+  }
+  const mcpCreds = readMcpJsonNexusCreds(directory);
+  if (!resolvedUrl && mcpCreds.apiUrl) {
+    resolvedUrl = mcpCreds.apiUrl;
+    source = ".mcp.json";
+  }
+  if (!resolvedToken && mcpCreds.token) {
+    resolvedToken = mcpCreds.token;
+    source = ".mcp.json";
+  }
+  if (resolvedUrl && resolvedToken) {
+    return { apiUrl: resolvedUrl, token: resolvedToken, source };
+  }
+  const ocCreds = readOpencodeJsonNexusCreds(directory);
+  if (!resolvedUrl && ocCreds.apiUrl) {
+    resolvedUrl = ocCreds.apiUrl;
+    source = "opencode.json";
+  }
+  if (!resolvedToken && ocCreds.token) {
+    resolvedToken = ocCreds.token;
+    source = "opencode.json";
+  }
+  if (resolvedUrl && resolvedToken) {
+    return { apiUrl: resolvedUrl, token: resolvedToken, source };
+  }
+  const projectCreds = readProjectLocalTomlCreds(directory);
+  if (!resolvedUrl && projectCreds.apiUrl) {
+    resolvedUrl = projectCreds.apiUrl;
+    source = "project-local-config";
+  }
+  if (!resolvedToken && projectCreds.token) {
+    resolvedToken = projectCreds.token;
+    source = "project-local-config";
+  }
+  if (resolvedUrl && resolvedToken) {
+    return { apiUrl: resolvedUrl, token: resolvedToken, source };
+  }
+  try {
+    const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
+    const configDir = join3(home, ".config", "nexus");
+    const configPath = join3(configDir, "config.toml");
+    const credsPath = join3(configDir, "credentials.toml");
+    if (!resolvedUrl && existsSync2(configPath)) {
+      const raw = readFileSync2(configPath, "utf-8");
+      const m = raw.match(/api_url\s*=\s*"([^"]+)"/);
+      if (m) {
+        resolvedUrl = m[1];
+        source = "global-config";
+      }
+    }
+    if (!resolvedToken && existsSync2(credsPath)) {
+      const raw = readFileSync2(credsPath, "utf-8");
+      const m = raw.match(/^\s*token\s*=\s*"([^"]+)"/m);
+      if (m) {
+        resolvedToken = m[1];
+        source = "global-config";
+      }
+    }
+    if (resolvedUrl && resolvedToken) return { apiUrl: resolvedUrl, token: resolvedToken, source };
+  } catch {
+  }
+  return null;
+}
+function readProjectIdFromAgentsMd(directory) {
+  try {
+    const agentsPath = join3(directory, ".nexus", "AGENTS.md");
+    if (!existsSync2(agentsPath)) return null;
+    const raw = readFileSync2(agentsPath, "utf-8");
+    const fmMatch = raw.match(/^---\s*\n([\s\S]*?)\n---/);
+    if (!fmMatch) return null;
+    const pidMatch = fmMatch[1].match(/project_id:\s*([0-9a-f-]{36})/);
+    return pidMatch ? pidMatch[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+// core/session-guard/release-line.ts
+var RELEASE_BRANCH_RE = /^staging\/release-(\d+\.\d+\.\d+)$/;
+var RELEASE_NUDGE_ENV = "NEXUS_SESSION_GUARD_RELEASE_NUDGE";
+var SESSION_LOOKUP_TIMEOUT_MS = 3e3;
+function isReleaseNudgeEnabled(env = process.env) {
+  const v = env[RELEASE_NUDGE_ENV]?.trim().toLowerCase();
+  return !(v === "off" || v === "0" || v === "false");
+}
+function readGitBranch(projectRoot) {
+  try {
+    const gitPath = join4(projectRoot, ".git");
+    let gitDir = gitPath;
+    if (statSync2(gitPath).isFile()) {
+      const m = readFileSync3(gitPath, "utf-8").match(/^gitdir:\s*(.+)$/m);
+      if (!m) return null;
+      const raw = m[1].trim();
+      gitDir = isAbsolute(raw) ? raw : resolve(projectRoot, raw);
+    }
+    const head = readFileSync3(join4(gitDir, "HEAD"), "utf-8").trim();
+    const ref = head.match(/^ref:\s*refs\/heads\/(.+)$/);
+    return ref ? ref[1] : null;
+  } catch {
+    return null;
+  }
+}
+function titleMatchesBranch(title, branch) {
+  if (!title.startsWith(branch)) return false;
+  const next = title.charAt(branch.length);
+  return next === "" || next === ":" || /\s/.test(next);
+}
+function evaluateReleaseLine(branch, openSessions) {
+  if (!branch) return { action: "skip", reason: "no_branch" };
+  if (!RELEASE_BRANCH_RE.test(branch)) return { action: "skip", reason: "not_release_branch" };
+  if (!openSessions) return { action: "skip", reason: "sessions_unknown" };
+  if (openSessions.some((s) => titleMatchesBranch(s.title, branch))) return { action: "in_line" };
+  return { action: "nudge", message: formatReleaseNudge(branch, openSessions[0]?.title ?? null) };
+}
+function formatReleaseNudge(branch, openTitle) {
+  const open = openTitle ? ` (open: "${truncate(openTitle, 80)}")` : " (no open session)";
+  const close = openTitle ? "close it with a summary (/nexus-session-close) and " : "";
+  return `[nexus-session-guard] Branch ${branch} has no matching Nexus session${open}. Per project rule: ${close}start "${branch}: <focus>" (/nexus-init).`;
+}
+function truncate(s, max) {
+  return s.length > max ? `${s.slice(0, max - 3)}...` : s;
+}
+async function fetchOpenSessions(config, projectId, timeoutMs = SESSION_LOOKUP_TIMEOUT_MS) {
+  try {
+    const res = await fetch(`${config.apiUrl}/api/mcp/sessions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.token}` },
+      body: JSON.stringify({ action: "session_list", project_id: projectId }),
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data.sessions)) return null;
+    return data.sessions.filter((s) => typeof s?.title === "string" && (s.status === void 0 || s.status === "open")).map((s) => ({ title: s.title }));
+  } catch {
+    return null;
+  }
+}
+async function checkReleaseLine(projectRoot, env = process.env, lookup = fetchOpenSessions, resolveConfig = getNexusConfig) {
+  if (!isReleaseNudgeEnabled(env)) return null;
+  const branch = readGitBranch(projectRoot);
+  if (!branch || !RELEASE_BRANCH_RE.test(branch)) return evaluateReleaseLine(branch, null);
+  const config = resolveConfig(projectRoot);
+  const projectId = env.NEXUS_PROJECT_ID?.trim() || readProjectIdFromAgentsMd(projectRoot);
+  const sessions = config && projectId ? await lookup(config, projectId) : null;
+  return evaluateReleaseLine(branch, sessions);
+}
+
 // core/project-root.ts
-import { statSync as statSync2 } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { statSync as statSync3 } from "node:fs";
+import { dirname, resolve as resolve2 } from "node:path";
 function resolveProjectRoot(cwd, env = process.env) {
   const projectDir = env.CLAUDE_PROJECT_DIR?.trim();
-  if (projectDir) return resolve(projectDir);
+  if (projectDir) return resolve2(projectDir);
   return findGitTopLevel(cwd ?? process.cwd());
 }
 function findGitTopLevel(start) {
-  let dir = resolve(start);
+  let dir = resolve2(start);
   for (let i = 0; i < 64; i++) {
     if (hasGitEntry(dir)) return dir;
     const parent = dirname(dir);
@@ -156,7 +367,7 @@ function findGitTopLevel(start) {
 }
 function hasGitEntry(dir) {
   try {
-    const st = statSync2(resolve(dir, ".git"));
+    const st = statSync3(resolve2(dir, ".git"));
     return st.isDirectory() || st.isFile();
   } catch {
     return false;
@@ -214,8 +425,26 @@ function handleHookEvent(mode, input, fileLog) {
       }
     };
   }
-  fileLog("warn", `Unknown mode "${mode}" (expected user-prompt-submit|post-tool-use) \u2014 no-op`);
+  fileLog("warn", `Unknown mode "${mode}" (expected session-start|user-prompt-submit|post-tool-use) \u2014 no-op`);
   return null;
+}
+async function handleSessionStart(directory, fileLog, env = process.env, lookup) {
+  const result = await checkReleaseLine(directory, env, lookup);
+  if (!result) {
+    fileLog("debug", "Release-line nudge disabled");
+    return null;
+  }
+  if (result.action !== "nudge") {
+    fileLog("debug", `Release-line check: ${result.action === "skip" ? result.reason : "in_line"}`);
+    return null;
+  }
+  fileLog("info", `Release-line nudge: ${result.message}`);
+  return {
+    hookSpecificOutput: {
+      hookEventName: "SessionStart",
+      additionalContext: result.message
+    }
+  };
 }
 async function readStdin() {
   const chunks = [];
@@ -237,7 +466,7 @@ async function main() {
   if (!directory) process.exit(0);
   input = { ...input, cwd: directory };
   const fileLog = createFileLogger(directory, "session-guard.log");
-  const output = handleHookEvent(mode, input, fileLog);
+  const output = mode === "session-start" ? await handleSessionStart(directory, fileLog) : handleHookEvent(mode, input, fileLog);
   if (output) {
     process.stdout.write(JSON.stringify(output));
   }
@@ -253,5 +482,6 @@ if (isEntrypoint(import.meta.url)) {
 export {
   STATE_FILE,
   handleHookEvent,
+  handleSessionStart,
   normalizeClaudeToolName
 };

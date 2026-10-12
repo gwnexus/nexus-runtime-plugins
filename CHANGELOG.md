@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`nexus-session-guard` v1.2.0 + `nexus-core` v1.3.0: release-line nudge.** For projects that keep one Nexus session per release line (`staging/release-X.Y.Z: <focus>`). At session start the guard reads the project root's branch from `.git/HEAD` (worktrees included, no subprocess). Only on a `staging/release-X.Y.Z` branch it fetches the open Nexus sessions (`session_list`, 3 s timeout); when no open session title starts with the branch name, it injects one line asking the agent to close the old session with a summary and start a matching one. It never closes or creates sessions itself and stays silent when the branch, credentials, project id or lookup are unavailable. Disable with `NEXUS_SESSION_GUARD_RELEASE_NUDGE=off`.
+  - Core: `core/session-guard/release-line.ts` (shared by both adapters).
+  - Claude Code: new `session-start` mode, registered in `nexus-core`'s `hooks/hooks.json` on `SessionStart` (`startup|resume|clear`), output via `hookSpecificOutput.additionalContext`.
+  - OpenCode: checked once on plugin load and appended once to the first tool output.
+  - 18 new tests: core matching (match, mismatch, no session, non-release branch, detached HEAD, worktree, disabled, lookup failures), the OpenCode one-shot delivery, and the built `session-guard` bundle against a local HTTP stub of the session endpoint. 353/353 tests pass. `nexus-core` bundles rebuilt.
+
 ### Fixed
 - **`nexus-core` v1.2.2 -- Claude Code hooks did nothing when started from an encoded or symlinked path; agent observer could lose state updates.**
   - **Entrypoint guard.** Every Claude Code adapter ran `main()` only if `import.meta.url === \`file://${process.argv[1]}\``. `import.meta.url` is percent-encoded and symlink-resolved, `process.argv[1]` is a raw path, so for a plugin path with a space or another encoded character, a Windows path, or a hook reached through a symlink, the check failed and the hook exited 0 without doing anything. New `core/entrypoint.ts` `isEntrypoint()` compares against `pathToFileURL(realpathSync(argv[1])).href`; all six adapters use it.
