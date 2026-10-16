@@ -44,4 +44,12 @@ describe("nexus-core plugin layout", () => {
   it("keeps the hooks wiring", () => {
     expect(existsSync(join(PLUGIN_DIR, "hooks", "hooks.json"))).toBe(true)
   })
+
+  it("runs the session-guard SessionStart hook for every session source, forks included", () => {
+    const hooks = JSON.parse(readFileSync(join(PLUGIN_DIR, "hooks", "hooks.json"), "utf8")).hooks
+    const entry = hooks.SessionStart.find((e: { hooks: { command: string }[] }) =>
+      e.hooks.some((h) => h.command.includes("session-guard.mjs session-start")),
+    )
+    expect(entry?.matcher?.split("|").sort()).toEqual(["clear", "fork", "resume", "startup"])
+  })
 })

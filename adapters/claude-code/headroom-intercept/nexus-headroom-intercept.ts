@@ -100,7 +100,7 @@ import { intercept, commitTransformed, commitTransformFailed } from "../../../co
 import { resolveProjectRoot } from "../../../core/project-root.ts"
 import { isEntrypoint } from "../../../core/entrypoint.ts"
 
-const PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.19" } as const
+const PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.20" } as const
 
 const DEFAULT_MODE: PluginMode = "observe"
 const DEBUG = process.env.HEADROOM_DEBUG === "true"

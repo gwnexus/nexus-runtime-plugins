@@ -64,7 +64,7 @@ function saveState(directory, fileName, state) {
 // core/session-guard/logic.ts
 var PLUGIN_META = {
   name: "nexus-session-guard",
-  version: "1.2.0",
+  version: "1.2.1",
   description: "Detects code-changing tool completions and reminds the agent to call nexus_session_append before proceeding."
 };
 var DEFAULT_TRIGGER_TOOLS = /* @__PURE__ */ new Set(["Edit", "Write", "MultiEdit"]);
@@ -155,13 +155,18 @@ function resolveNexusConfig(directory, env = process.env) {
   if (project.apiUrl && project.token) return { apiUrl: project.apiUrl, token: project.token, source: "project" };
   const home = env.HOME ?? env.USERPROFILE ?? "";
   const later = [
+    ["env", () => fromEnv],
     ["mcp", () => readJsonEnv(join3(directory, ".mcp.json"), (j) => j?.mcpServers?.nexus?.env)],
     ["opencode", () => readJsonEnv(join3(directory, "opencode.json"), (j) => j?.mcp?.nexus?.environment)],
     ["global", () => home ? readTomlPair(join3(home, ".config", "nexus")) : {}]
   ];
   for (const [source, read] of later) {
     const c = read();
-    if (!c.apiUrl || !c.token) continue;
+    if (!c.token) continue;
+    if (!c.apiUrl) {
+      if (project.apiUrl) return { apiUrl: project.apiUrl, token: c.token, source };
+      continue;
+    }
     if (pinnedUrl && normalizeUrl(c.apiUrl) !== pinnedUrl) continue;
     return { apiUrl: c.apiUrl, token: c.token, source };
   }

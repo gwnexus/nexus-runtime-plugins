@@ -92,6 +92,50 @@ describe("resolveNexusConfig", () => {
     })
   })
 
+  it("pairs a token-only later source with the project's pinned API", () => {
+    projectToml("https://staging.example", null)
+    writeFileSync(
+      join(project, ".mcp.json"),
+      JSON.stringify({ mcpServers: { nexus: { env: { NEXUS_PRIVATE_TOKEN: "mcp-token" } } } }),
+    )
+    expect(resolveNexusConfig(project, env())).toEqual({
+      apiUrl: "https://staging.example",
+      token: "mcp-token",
+      source: "mcp",
+    })
+  })
+
+  it("pairs a token-only env with the project's pinned API", () => {
+    projectToml("https://staging.example", null)
+    mcpJson("https://staging.example", "mcp-token")
+    expect(resolveNexusConfig(project, { ...env(), NEXUS_PRIVATE_TOKEN: "env-token" })).toEqual({
+      apiUrl: "https://staging.example",
+      token: "env-token",
+      source: "env",
+    })
+  })
+
+  it("still skips a later source with a conflicting URL when a token-only source follows", () => {
+    projectToml("https://staging.example", null)
+    mcpJson("https://prod.example", "prod-token")
+    writeFileSync(join(home, ".config", "nexus", "credentials.toml"), `token = "global-token"\n`)
+    expect(resolveNexusConfig(project, env())).toEqual({
+      apiUrl: "https://staging.example",
+      token: "global-token",
+      source: "global",
+    })
+  })
+
+  it("skips a token-only source when no API is pinned", () => {
+    writeFileSync(
+      join(project, ".mcp.json"),
+      JSON.stringify({ mcpServers: { nexus: { env: { NEXUS_PRIVATE_TOKEN: "mcp-token" } } } }),
+    )
+    expect(resolveNexusConfig(project, { ...env(), NEXUS_PRIVATE_TOKEN: "env-token" })).toBeNull()
+    globalToml("https://prod.example", "prod-token")
+    expect(resolveNexusConfig(project, env())?.source).toBe("global")
+  })
+
   it("treats missing files, malformed TOML/JSON and placeholders as absent", () => {
     writeFileSync(join(project, ".nexus", "config.toml"), "api_url = staging.example\n[[[")
     writeFileSync(join(project, ".nexus", "credentials.toml"), "token = \n")

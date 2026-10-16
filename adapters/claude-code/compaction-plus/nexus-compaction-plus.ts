@@ -63,7 +63,7 @@ import type { NormalizedToolCall, NexusState } from "../../../core/compaction-pl
 import { resolveProjectRoot } from "../../../core/project-root.ts"
 import { isEntrypoint } from "../../../core/entrypoint.ts"
 
-const PLUGIN_META = { name: "nexus-compaction-plus", version: "1.8.3" } as const
+const PLUGIN_META = { name: "nexus-compaction-plus", version: "1.8.4" } as const
 
 interface ClaudeHookInput {
   cwd?: string

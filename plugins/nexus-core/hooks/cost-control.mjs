@@ -79,13 +79,18 @@ function resolveNexusConfig(directory, env = process.env) {
   if (project.apiUrl && project.token) return { apiUrl: project.apiUrl, token: project.token, source: "project" };
   const home = env.HOME ?? env.USERPROFILE ?? "";
   const later = [
+    ["env", () => fromEnv],
     ["mcp", () => readJsonEnv(join3(directory, ".mcp.json"), (j) => j?.mcpServers?.nexus?.env)],
     ["opencode", () => readJsonEnv(join3(directory, "opencode.json"), (j) => j?.mcp?.nexus?.environment)],
     ["global", () => home ? readTomlPair(join3(home, ".config", "nexus")) : {}]
   ];
   for (const [source, read] of later) {
     const c = read();
-    if (!c.apiUrl || !c.token) continue;
+    if (!c.token) continue;
+    if (!c.apiUrl) {
+      if (project.apiUrl) return { apiUrl: project.apiUrl, token: c.token, source };
+      continue;
+    }
     if (pinnedUrl && normalizeUrl(c.apiUrl) !== pinnedUrl) continue;
     return { apiUrl: c.apiUrl, token: c.token, source };
   }
@@ -382,7 +387,7 @@ function isEntrypoint(moduleUrl, argv1 = process.argv[1]) {
 }
 
 // adapters/claude-code/cost-control/nexus-cost-control.ts
-var PLUGIN_META = { name: "nexus-cost-control", version: "1.2.2" };
+var PLUGIN_META = { name: "nexus-cost-control", version: "1.2.3" };
 var STATE_FILE = "cost-control-state.json";
 function initialState() {
   return { lastAppendAt: null, lastAppendedTokens: null };

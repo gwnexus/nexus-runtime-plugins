@@ -693,13 +693,18 @@ function resolveNexusConfig(directory, env = process.env) {
   if (project.apiUrl && project.token) return { apiUrl: project.apiUrl, token: project.token, source: "project" };
   const home = env.HOME ?? env.USERPROFILE ?? "";
   const later = [
+    ["env", () => fromEnv],
     ["mcp", () => readJsonEnv(join4(directory, ".mcp.json"), (j) => j?.mcpServers?.nexus?.env)],
     ["opencode", () => readJsonEnv(join4(directory, "opencode.json"), (j) => j?.mcp?.nexus?.environment)],
     ["global", () => home ? readTomlPair(join4(home, ".config", "nexus")) : {}]
   ];
   for (const [source, read] of later) {
     const c = read();
-    if (!c.apiUrl || !c.token) continue;
+    if (!c.token) continue;
+    if (!c.apiUrl) {
+      if (project.apiUrl) return { apiUrl: project.apiUrl, token: c.token, source };
+      continue;
+    }
     if (pinnedUrl && normalizeUrl(c.apiUrl) !== pinnedUrl) continue;
     return { apiUrl: c.apiUrl, token: c.token, source };
   }
@@ -1057,7 +1062,7 @@ function isEntrypoint(moduleUrl, argv1 = process.argv[1]) {
 }
 
 // adapters/claude-code/headroom-intercept/nexus-headroom-intercept.ts
-var PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.19" };
+var PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.20" };
 var DEFAULT_MODE = "observe";
 var DEBUG = process.env.HEADROOM_DEBUG === "true";
 var GATE_STATE_FILE = "headroom-gate-state.json";

@@ -12,11 +12,13 @@ import { join } from "node:path"
  *   4. opencode <dir>/opencode.json mcp.nexus.environment
  *   5. global   ~/.config/nexus/config.toml + credentials.toml
  *
- * A source counts only when it yields both URL and token; fields are never
- * mixed across sources, so a token is only ever sent to the API it was
- * configured with. When the project-local config pins an `api_url`, later
- * sources are accepted only if they point at that same API, so a project
- * linked to e.g. staging never falls through to production credentials.
+ * A source counts only when it yields both URL and token; a URL from one
+ * source is never combined with a token configured for another API. When the
+ * project-local config pins an `api_url`, later sources are accepted only if
+ * they point at that same API, so a project linked to e.g. staging never falls
+ * through to production credentials. The one exception: a later source that
+ * carries a token but no URL (e.g. NEXUS_PRIVATE_TOKEN without NEXUS_API_URL)
+ * is paired with the pinned URL. Without a pinned URL it is skipped.
  * Hooks run outside `nexus run`, so the env source is usually absent.
  */
 
@@ -46,13 +48,19 @@ export function resolveNexusConfig(
 
   const home = env.HOME ?? env.USERPROFILE ?? ""
   const later: Array<[NexusConfigSource, () => Candidate]> = [
+    ["env", () => fromEnv],
     ["mcp", () => readJsonEnv(join(directory, ".mcp.json"), (j) => j?.mcpServers?.nexus?.env)],
     ["opencode", () => readJsonEnv(join(directory, "opencode.json"), (j) => j?.mcp?.nexus?.environment)],
     ["global", () => (home ? readTomlPair(join(home, ".config", "nexus")) : {})],
   ]
   for (const [source, read] of later) {
     const c = read()
-    if (!c.apiUrl || !c.token) continue
+    if (!c.token) continue
+    if (!c.apiUrl) {
+      // Token-only source: usable only with the project's pinned API.
+      if (project.apiUrl) return { apiUrl: project.apiUrl, token: c.token, source }
+      continue
+    }
     if (pinnedUrl && normalizeUrl(c.apiUrl) !== pinnedUrl) continue
     return { apiUrl: c.apiUrl, token: c.token, source }
   }

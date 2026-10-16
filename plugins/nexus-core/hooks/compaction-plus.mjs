@@ -46,13 +46,18 @@ function resolveNexusConfig(directory, env = process.env) {
   if (project.apiUrl && project.token) return { apiUrl: project.apiUrl, token: project.token, source: "project" };
   const home = env.HOME ?? env.USERPROFILE ?? "";
   const later = [
+    ["env", () => fromEnv],
     ["mcp", () => readJsonEnv(join2(directory, ".mcp.json"), (j) => j?.mcpServers?.nexus?.env)],
     ["opencode", () => readJsonEnv(join2(directory, "opencode.json"), (j) => j?.mcp?.nexus?.environment)],
     ["global", () => home ? readTomlPair(join2(home, ".config", "nexus")) : {}]
   ];
   for (const [source, read] of later) {
     const c = read();
-    if (!c.apiUrl || !c.token) continue;
+    if (!c.token) continue;
+    if (!c.apiUrl) {
+      if (project.apiUrl) return { apiUrl: project.apiUrl, token: c.token, source };
+      continue;
+    }
     if (pinnedUrl && normalizeUrl(c.apiUrl) !== pinnedUrl) continue;
     return { apiUrl: c.apiUrl, token: c.token, source };
   }
@@ -220,7 +225,7 @@ function isEntrypoint(moduleUrl, argv1 = process.argv[1]) {
 }
 
 // adapters/claude-code/compaction-plus/nexus-compaction-plus.ts
-var PLUGIN_META = { name: "nexus-compaction-plus", version: "1.8.3" };
+var PLUGIN_META = { name: "nexus-compaction-plus", version: "1.8.4" };
 function parseClaudeTranscript(transcriptPath) {
   const calls = [];
   if (!existsSync(transcriptPath)) return calls;

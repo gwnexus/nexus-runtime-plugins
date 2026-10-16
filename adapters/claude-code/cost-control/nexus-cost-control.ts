@@ -61,7 +61,7 @@ import type { NormalizedToolCall } from "../../../core/cost-control/types.ts"
 import { resolveProjectRoot } from "../../../core/project-root.ts"
 import { isEntrypoint } from "../../../core/entrypoint.ts"
 
-const PLUGIN_META = { name: "nexus-cost-control", version: "1.2.2" } as const
+const PLUGIN_META = { name: "nexus-cost-control", version: "1.2.3" } as const
 const STATE_FILE = "cost-control-state.json"
 
 interface CostControlState {

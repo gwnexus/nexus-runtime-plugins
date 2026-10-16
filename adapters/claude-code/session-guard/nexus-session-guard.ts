@@ -44,7 +44,7 @@
  *   {
  *     "hooks": {
  *       "SessionStart": [
- *         { "matcher": "startup|resume|clear", "hooks": [{ "type": "command", "command": "node adapters/claude-code/session-guard/nexus-session-guard.ts session-start" }] }
+ *         { "matcher": "startup|resume|clear|fork", "hooks": [{ "type": "command", "command": "node adapters/claude-code/session-guard/nexus-session-guard.ts session-start" }] }
  *       ],
  *       "UserPromptSubmit": [
  *         { "hooks": [{ "type": "command", "command": "node adapters/claude-code/session-guard/nexus-session-guard.ts user-prompt-submit" }] }
