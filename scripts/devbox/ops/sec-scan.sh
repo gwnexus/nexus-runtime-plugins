@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # -------------------------------------------------------------------
-# scripts/devbox/ops/sec-scan.sh — Security & secrets scan
+# scripts/devbox/ops/sec-scan.sh: Security & secrets scan
 # @version 3.0.0
 # -------------------------------------------------------------------
 set -euo pipefail
@@ -22,7 +22,7 @@ if dbx_has rg; then
     dbx_ok "secrets scan" "no obvious patterns found"
   fi
 else
-  dbx_warn "ripgrep" "not available — skipping deep scan"
+  dbx_warn "ripgrep" "not available, skipping deep scan"
 fi
 
 echo

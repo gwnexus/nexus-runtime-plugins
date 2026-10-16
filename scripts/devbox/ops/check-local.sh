@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # -------------------------------------------------------------------
-# scripts/devbox/ops/check-local.sh — Validate local environment
+# scripts/devbox/ops/check-local.sh: Validate local environment
 # @version 3.0.0
 # -------------------------------------------------------------------
 set -euo pipefail

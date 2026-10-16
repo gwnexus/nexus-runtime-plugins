@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # -------------------------------------------------------------------
-# scripts/devbox/ops/validate.sh — Validate repo structure + syntax
+# scripts/devbox/ops/validate.sh: Validate repo structure + syntax
 # @version 3.0.0
 # -------------------------------------------------------------------
 set -euo pipefail

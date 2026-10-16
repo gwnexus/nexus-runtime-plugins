@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # -------------------------------------------------------------------
-# scripts/devbox/lib/common.sh — Shared library for devbox scripts
+# scripts/devbox/lib/common.sh: Shared library for devbox scripts
 # @version 3.0.0
 # -------------------------------------------------------------------
 # Source this file; do NOT execute directly.
@@ -36,9 +36,9 @@ fi
 
 dbx_icon() {
   case "${DBX_ICON_SET}:${1}" in
-    ascii:ok)   printf "OK"  ;; ascii:fail) printf "ERR" ;; ascii:warn) printf "WRN" ;;
-    ticks:ok)   printf "✓"   ;; ticks:fail) printf "✗"   ;; ticks:warn) printf "⚠"   ;;
-    blocks:ok)  printf "■"   ;; blocks:fail)printf "■"   ;; blocks:warn)printf "■"   ;;
+    ascii:ok)   printf "OK"  ;; ascii:fail) printf "ERR" ;; ascii:warn) printf "WRN" ;; ascii:info) printf "--"  ;;
+    ticks:ok)   printf "✓"   ;; ticks:fail) printf "✗"   ;; ticks:warn) printf "⚠"   ;; ticks:info) printf "·"   ;;
+    blocks:ok)  printf "■"   ;; blocks:fail)printf "■"   ;; blocks:warn)printf "■"   ;; blocks:info)printf "□"   ;;
     *)          printf "%s" "$1" ;;
   esac
 }
