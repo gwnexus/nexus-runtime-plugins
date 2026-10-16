@@ -7,7 +7,6 @@ on outgoing requests to the Nexus gateway provider, for the
 **Current version:** `v1.0.0`
 **Requires:** none beyond the standard plugin context (no Nexus MCP session
 required)
-**Ref:** dispatch `5999b7d6-8b1f-4b1a-8101-ce7f5d6695df` (NEXUS-APP)
 
 ## What it does
 
@@ -28,8 +27,8 @@ headers directly into that outgoing request:
 | `x-nexus-actor-slug` | `input.agent` verbatim, for every other agent name (sub-actor invocations, and OpenCode's own internal calls like `title`) |
 
 These headers are **attribution-only**. They are never used for routing or
-authentication on the gateway side (see dispatch `16973ead`, 2026-09-04,
-which specified the gateway side of this contract).
+authentication on the gateway side; the gateway side of this contract was
+specified on 2026-09-04.
 
 ## Scoping: nexus provider only
 

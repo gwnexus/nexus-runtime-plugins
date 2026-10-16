@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * Nexus Routing Guard — Claude Code adapter (ADR-C05, Track B2, Dispatch dc5fdf9a).
+ * Nexus Routing Guard: Claude Code adapter.
  *
  * Capability matrix: `routing_guard` = "partial" for Claude Code. There is no
  * equivalent to OpenCode's `experimental.chat.system.transform` (an
  * in-session, continuous system-prompt injection point) in Claude Code.
- * Per the dispatch's explicit instruction, this gap is disclosed, not
+ * Deliberately, this gap is disclosed, not
  * papered over with a fragile workaround: validation here only happens
  * before the session starts (`SessionStart`), not continuously mid-session.
  *
@@ -19,9 +19,8 @@
  * table directly from the running instance. Claude Code has no equivalent
  * SDK surface for this plugin to query.
  *
- * CATALOG SOURCE (confirmed live against nexus-cli v0.17.2 on 2026-09-20,
- * see Dispatch dc5fdf9a reply from nexus-app): `nexus pull`/`nexus init`
- * writes two files relative to the project's agentic root:
+ * CATALOG SOURCE (confirmed live against nexus-cli v0.17.2 on 2026-09-20):
+ * `nexus pull`/`nexus init` writes two files relative to the project's agentic root:
  *
  *   .nexus/generated/routing-catalog.json  -> { model_routes: [...] }
  *   .nexus/generated/agent-routing.json    -> { actors: [...] }
@@ -30,12 +29,12 @@
  * converted to the plugin's internal `ProviderCatalog`/`AgentInfo[]` shape
  * via `core/routing-guard/nexus-cli-catalog.ts`. See that module for the
  * `model_profile_id` <-> `route_alias` linkage assumption, which has not
- * yet been explicitly confirmed by nexus-app.
+ * yet been explicitly confirmed by the Nexus CLI.
  *
- * KNOWN CAVEAT (confirmed by nexus-app, not a bug): nexus-cli only injects
+ * KNOWN CAVEAT (confirmed Nexus CLI behavior, not a bug): nexus-cli only injects
  * the env vars below into `.claude/settings.json` on first-creation of that
  * file. Projects with a pre-existing `.claude/settings.json` (e.g. from
- * Track B1 testing) will not have these vars until the file is deleted and
+ * earlier testing) will not have these vars until the file is deleted and
  * regenerated via `nexus pull --force`. The default file paths below make
  * this less of an issue going forward, since the adapter finds the files
  * itself without needing the env vars at all -- the env vars are now only
@@ -185,7 +184,7 @@ async function main(): Promise<void> {
   }
 
   // Anchor every .nexus/ read and write at the project root, not the session's
-  // current cwd (Dispatch b7d15add); skip entirely when no root resolves.
+  // current cwd; skip entirely when no root resolves.
   const directory = resolveProjectRoot(input.cwd)
   if (!directory) process.exit(0)
   input = { ...input, cwd: directory }

@@ -2,8 +2,7 @@ import { statSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 
 /**
- * Resolve the project root for a Claude Code hook invocation (Dispatch
- * `b7d15add`, nexus-app).
+ * Resolve the project root for a Claude Code hook invocation.
  *
  * The hook payload's `cwd` is the session's *current* working directory,
  * which moves whenever the agent `cd`s into a subfolder. Using it directly

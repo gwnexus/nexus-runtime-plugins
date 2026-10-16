@@ -11,7 +11,7 @@ import { checkReleaseLine } from "../../../core/session-guard/release-line.ts"
 import { findGitTopLevel } from "../../../core/project-root.ts"
 
 /**
- * Nexus Session Guard — OpenCode adapter (ADR-C05).
+ * Nexus Session Guard: OpenCode adapter.
  *
  * Wires the runtime-agnostic core/session-guard/logic.ts state machine to
  * OpenCode's plugin hooks. State is kept in memory since the OpenCode

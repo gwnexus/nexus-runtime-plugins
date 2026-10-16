@@ -57,7 +57,7 @@ const bigText = JSON.stringify({
 })
 
 /**
- * Fixture from a live capture (Dispatch 1bc7ff92, 2026-09-24): a real Claude
+ * Fixture from a live capture (2026-09-24): a real Claude
  * Code session calling `mcp__nexus__kb_search`, logged by a temporary
  * PostToolUse hook that recorded structure only. Observed: `tool_response` is
  * an array of length 1 whose block has keys `type` (string) and `text`

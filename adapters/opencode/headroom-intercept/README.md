@@ -9,7 +9,7 @@ compression before tool results enter the agent context window.
 **Default mode:** `observe` (safe — metrics only, no mutation)  
 **Transform mode:** experimental, requires explicit opt-in and provider-level verification
 
-> Migrated to the ADR-C05 `core/` + `adapters/` structure (Track B2). All
+> Migrated to the `core/` + `adapters/` structure. All
 > policy, compression, cache, and credential-resolution logic now lives in
 > [`core/headroom-intercept/`](../../../core/headroom-intercept), shared with
 > the [Claude Code adapter](../../claude-code/headroom-intercept). This file
@@ -166,10 +166,6 @@ Activity is logged as structured JSONL to `.nexus/headroom-intercept.jsonl`
 - OpenCode with `@opencode-ai/plugin` `^1.14.0`
 - Nexus MCP server configured
 - `NEXUS_API_URL` and `NEXUS_PRIVATE_TOKEN` (or `~/.config/nexus/` TOML files)
-
-## Architecture Decision
-
-See ADR-0060: Headroom Pre-Injection Compression via OpenCode Plugin.
 
 ## Testing
 

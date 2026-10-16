@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Nexus Cost Control — Claude Code adapter (ADR-C05, Track B2, Dispatch dc5fdf9a).
+ * Nexus Cost Control: Claude Code adapter.
  *
  * Capability matrix: `cost_control` = "partial" for Claude Code. Claude Code
  * has no idle-detection event (no equivalent to OpenCode's `session.idle`);
@@ -22,8 +22,7 @@
  * formatting, and the Nexus API call are shared verbatim with the OpenCode
  * adapter via core/cost-control/*.
  *
- * Precedence (per ADR-0040, nexus-app; corrected 2026-09-23, Dispatch
- * `6298a740`): native transcript-usage aggregation (`aggregateClaudeUsage`)
+ * Precedence (by design; corrected 2026-09-23): native transcript-usage aggregation (`aggregateClaudeUsage`)
  * is the default, zero-configuration source and always runs when Helicone
  * has no data. Helicone is optional, opt-in enrichment -- if
  * `HELICONE_API_KEY` is configured, it is queried first and its result
@@ -146,7 +145,7 @@ const IDLE_DEBOUNCE_MS = 5 * 60 * 1000 // 5 minutes — same window as the OpenC
 /**
  * Aggregate token usage directly from a Claude Code transcript's assistant
  * message `usage` blocks, used as a fallback cost-control source when
- * Helicone has no data for a session (Dispatch 515186c1) -- e.g. Claude Max
+ * Helicone has no data for a session -- e.g. Claude Max
  * sessions that talk directly to Anthropic and never pass through the
  * Helicone gateway. No cost figure is derivable here -- only Helicone knows
  * the metered dollar cost.
@@ -279,7 +278,7 @@ async function main(): Promise<void> {
   }
 
   // Anchor every .nexus/ read and write at the project root, not the session's
-  // current cwd (Dispatch b7d15add); skip entirely when no root resolves.
+  // current cwd; skip entirely when no root resolves.
   const directory = resolveProjectRoot(input.cwd)
   if (!directory) process.exit(0)
   input = { ...input, cwd: directory }

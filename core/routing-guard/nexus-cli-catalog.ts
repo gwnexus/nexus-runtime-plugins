@@ -1,9 +1,8 @@
 import type { AgentInfo, ProviderCatalog } from "./types.ts"
 
 /**
- * Transform for the real nexus-cli-generated routing files (ADR-C05 core
- * module), confirmed live against nexus-cli v0.17.2 on 2026-09-20 (see
- * Dispatch dc5fdf9a reply from nexus-app):
+ * Transform for the real nexus-cli-generated routing files (core module),
+ * confirmed live against nexus-cli v0.17.2 on 2026-09-20:
  *
  *   .nexus/generated/routing-catalog.json  -> { model_routes: ModelRoute[] }
  *   .nexus/generated/agent-routing.json    -> { actors: ActorEntry[] }
@@ -14,7 +13,7 @@ import type { AgentInfo, ProviderCatalog } from "./types.ts"
  * functions convert the real files into that shape so the shared core
  * detection logic doesn't need to know about nexus-cli's file format.
  *
- * ASSUMPTION (not yet confirmed by nexus-app, flagged in the adapter
+ * ASSUMPTION (not yet confirmed by the Nexus platform, flagged in the adapter
  * README): an actor's `model_profile_id` corresponds 1:1 to a model route's
  * `route_alias`. If nexus-cli's actual linkage differs, this mapping will
  * need correction.

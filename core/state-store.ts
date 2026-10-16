@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs"
 import { join } from "node:path"
 
 /**
- * Simple JSON file-based state persistence (ADR-C05 core module).
+ * Simple JSON file-based state persistence (core module).
  *
  * Claude Code hooks are invoked as short-lived external processes (one per
  * hook event), unlike OpenCode plugins which run as a single long-lived
@@ -18,7 +18,7 @@ export function loadState<T>(directory: string, fileName: string, fallback: T): 
     const raw = readFileSync(path, "utf-8")
     const parsed: unknown = JSON.parse(raw)
     // Only object-merge when both sides are plain objects (e.g. SessionMetrics,
-    // GateState). Spreading a non-object value (Fix, Dispatch 0e38cf7b review:
+    // GateState). Spreading a non-object value (fix:
     // a bare JSON string like "s-1" spread as `{ ...fallback, ..."s-1" }`
     // silently produced `{0:'s',1:'-',2:'1'}` instead of the string, which made
     // every session_id comparison in headroom-intercept's session-based metrics

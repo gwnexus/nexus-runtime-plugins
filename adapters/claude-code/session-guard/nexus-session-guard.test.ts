@@ -41,7 +41,7 @@ describe("session-guard Claude Code adapter", () => {
     })
   })
 
-  it("post-tool-use recognizes mcp__nexus__session_append (Dispatch 0e38cf7b review)", () => {
+  it("post-tool-use recognizes mcp__nexus__session_append", () => {
     handleHookEvent("user-prompt-submit", { cwd }, fileLog)
     handleHookEvent("post-tool-use", { cwd, tool_name: "mcp__nexus__session_append" }, fileLog)
 

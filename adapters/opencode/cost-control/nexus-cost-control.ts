@@ -9,7 +9,7 @@ import { emptyRuntimeUsage, buildRuntimeCostEntry, type RuntimeUsage } from "../
 import type { NormalizedToolCall } from "../../../core/cost-control/types.ts"
 
 /**
- * Nexus Cost Control — OpenCode adapter (ADR-C05, Track B2).
+ * Nexus Cost Control: OpenCode adapter.
  *
  * Wires the runtime-agnostic core/cost-control logic (credential resolution,
  * state extraction, Helicone query, formatting, Nexus API call) to
@@ -18,8 +18,8 @@ import type { NormalizedToolCall } from "../../../core/cost-control/types.ts"
  * OpenCode's message/part shape into the shared `NormalizedToolCall[]`
  * format is the only OpenCode-specific concern left in this file.
  *
- * Precedence (per ADR-0040, nexus-app; corrected 2026-09-23, Dispatch
- * `6298a740` after drift was found during the ADR-C05 restructure): native
+ * Precedence (corrected 2026-09-23 after drift was found during the
+ * core/adapters restructure): native
  * OpenCode message-data aggregation (`aggregateOpenCodeUsage`) is the
  * default, zero-configuration cost/usage source and always runs. Helicone
  * is optional, opt-in enrichment — if `HELICONE_API_KEY` is configured, it
@@ -54,8 +54,8 @@ interface AssistantMessageInfo {
 /**
  * Aggregate token usage directly from OpenCode's native message data
  * (`info.tokens`), used as a fallback cost-control source when Helicone has
- * no data for a session (Dispatch 515186c1). No cost figure is derivable
- * here — only Helicone knows the metered dollar cost.
+ * no data for a session. No cost figure is derivable
+ * here; only Helicone knows the metered dollar cost.
  */
 export function aggregateOpenCodeUsage(
   messages: Array<{ info: { role: string }; parts: Array<Record<string, unknown>> }>,

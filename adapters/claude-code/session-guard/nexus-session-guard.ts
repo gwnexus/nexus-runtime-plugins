@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Nexus Session Guard — Claude Code adapter (ADR-C05, Track B2, Dispatch dc5fdf9a).
+ * Nexus Session Guard: Claude Code adapter.
  *
  * Wires the runtime-agnostic core/session-guard/logic.ts state machine to
  * Claude Code's hook protocol. Unlike the OpenCode adapter, Claude Code
@@ -14,20 +14,19 @@
  * per user turn, which is a close but not perfectly identical semantic
  * match to OpenCode's per-message.updated dedup logic.
  *
- * CONFIRMED (2026-09-20, official hooks reference, see Dispatch `dc5fdf9a`
- * reply from nexus-app): `hookSpecificOutput.additionalContext` is the
+ * CONFIRMED (2026-09-20, official hooks reference): `hookSpecificOutput.additionalContext` is the
  * correct field for both `PostToolUse` and `UserPromptSubmit` — it adds
  * supplementary text alongside the tool's actual result (exactly what a
  * reminder needs), unlike `updatedToolOutput` which replaces the result
  * entirely (used by headroom-intercept instead). No changes needed; this
  * adapter's approach matches the documented pattern as originally written.
  *
- * Fix (Dispatch 0e38cf7b review, 2026-09-24): Claude Code sends Nexus MCP
+ * Fix (2026-09-24): Claude Code sends Nexus MCP
  * tool calls as `mcp__nexus__task_create`, `mcp__nexus__adr_create`, etc.,
  * not the OpenCode-style `nexus_task_create` this adapter's `PostToolUse`
  * matcher and `isTriggerTool()`/`DEFAULT_TRIGGER_MCP` check expect (same
  * root cause as the headroom-intercept tool-name-mismatch bug fixed
- * earlier in this dispatch). The matcher never fired for these tool names
+ * earlier). The matcher never fired for these tool names
  * at all, so session-guard never saw or reminded about them. Fixed with
  * the same `normalizeClaudeToolName()` approach used in the Claude Code
  * headroom-intercept adapter (kept local to this adapter; core stays
@@ -88,7 +87,7 @@ export type HookMode = "session-start" | "user-prompt-submit" | "post-tool-use"
 /**
  * Normalize Claude Code's MCP tool name into the core logic's naming
  * convention (same mapping as the headroom-intercept adapter's
- * `normalizeClaudeToolName`, Dispatch 0e38cf7b): `mcp__nexus__X` -> `nexus_X`.
+ * `normalizeClaudeToolName`): `mcp__nexus__X` -> `nexus_X`.
  * Native tools (`Edit`, `Write`, `Bash`, ...) pass through unchanged.
  */
 export function normalizeClaudeToolName(toolName: string): string {
@@ -199,7 +198,7 @@ async function main(): Promise<void> {
   }
 
   // Anchor every .nexus/ read and write at the project root, not the session's
-  // current cwd (Dispatch b7d15add); skip entirely when no root resolves.
+  // current cwd; skip entirely when no root resolves.
   const directory = resolveProjectRoot(input.cwd)
   if (!directory) process.exit(0)
   input = { ...input, cwd: directory }

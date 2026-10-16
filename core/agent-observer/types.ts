@@ -1,5 +1,5 @@
 /**
- * nexus-agent-observer types (ADR-0120).
+ * nexus-agent-observer types.
  *
  * `AgentObservation` is one line of `<agentic_root>/claude/observer/events.jsonl`
  * and must stay in sync with
@@ -14,7 +14,7 @@ export const PLUGIN_META = {
 
 export const OBSERVATION_SCHEMA = "nexus.agent-observation.v1"
 
-/** Max length of the `task` summary (dispatch 34a59203 constraint). */
+/** Max length of the `task` summary (event contract constraint). */
 export const TASK_MAX_CHARS = 120
 
 export type AgentRole = "main" | "subagent" | "background"

@@ -1,12 +1,12 @@
 # nexus-routing-guard (Claude Code adapter)
 
-Claude Code hook adapter for `nexus-routing-guard`, part of the ADR-C05
-core/adapters restructure (Track B2, Dispatch `dc5fdf9a`).
+Claude Code hook adapter for `nexus-routing-guard`, part of the
+core/adapters restructure.
 
 **Capability matrix status:** `partial` (see `routing_guard` entry in
 `capability-matrix.v1.json`). No equivalent to OpenCode's
 `experimental.chat.system.transform` (continuous in-session banner/
-validation) exists in Claude Code. Per the dispatch's explicit instruction,
+validation) exists in Claude Code. Deliberately,
 this gap is disclosed, not faked with a fragile workaround: validation here
 only happens **once, before the session starts**, not continuously
 mid-session.
@@ -23,8 +23,7 @@ calls that return the live, merged provider/model catalog and agent routing
 table directly from the running instance. **Claude Code has no equivalent
 SDK surface for this plugin to query.**
 
-**Confirmed live against nexus-cli v0.17.2 (2026-09-20, see Dispatch
-`dc5fdf9a` reply from nexus-app):** `nexus pull`/`nexus init` writes two
+**Confirmed live against nexus-cli v0.17.2 (2026-09-20):** `nexus pull`/`nexus init` writes two
 files relative to the project's agentic root:
 
 ```
@@ -40,14 +39,14 @@ are only needed to override the default file location (e.g. for manual
 testing with hand-written catalog/agent JSON in the plugin's own internal
 shape, which is also still accepted as a fallback).
 
-**Assumption not yet explicitly confirmed by nexus-app:** an actor's
+**Assumption not yet explicitly confirmed by the Nexus CLI:** an actor's
 `model_profile_id` corresponds 1:1 to a model route's `route_alias`. If
 nexus-cli's actual linkage differs, `buildAgentInfoFromActors()` needs
 correction — flagged in that module's code comments.
 
-**Known caveat (confirmed by nexus-app, not a bug):** nexus-cli only injects
+**Known caveat (confirmed Nexus CLI behavior, not a bug):** nexus-cli only injects
 env vars into `.claude/settings.json` on first-creation of that file.
-Projects with a pre-existing `.claude/settings.json` (e.g. from Track B1
+Projects with a pre-existing `.claude/settings.json` (e.g. from earlier
 testing) won't have the env vars until the file is deleted and regenerated
 via `nexus pull --force`. This is now less of an issue since the adapter
 finds the two files itself at their default location without needing the

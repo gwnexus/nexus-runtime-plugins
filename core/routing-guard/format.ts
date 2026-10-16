@@ -2,7 +2,7 @@ import type { RoutingWarning } from "./types.ts"
 
 /**
  * Format routing divergence warnings as a deterministic tool-output banner
- * (ADR-C05 core module) — runtime-agnostic text, unchanged wording from the
+ * (core module), runtime-agnostic text, unchanged wording from the
  * original plugin except generalized from "OpenCode instance" to "runtime
  * instance" so it reads correctly from either adapter.
  */

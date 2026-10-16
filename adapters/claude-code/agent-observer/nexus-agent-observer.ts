@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Nexus Agent Observer — Claude Code adapter (ADR-0120, Dispatch 34a59203).
+ * Nexus Agent Observer: Claude Code adapter.
  *
  * Appends one `nexus.agent-observation.v1` JSON line per Claude Code hook
  * event to `<agentic_root>/claude/observer/events.jsonl` (normally
@@ -8,7 +8,7 @@
  * `nexus status --agents` (nexus-cli) renders in the Agent Observability
  * pane. The event -> record mapping lives in core/agent-observer/mapping.ts.
  *
- * Constraints (from the dispatch): always exit 0, never write to stdout, no
+ * Constraints: always exit 0, never write to stdout, no
  * network, no subprocesses, errors at most to stderr. Tool inputs/outputs,
  * prompt text beyond a 120-char task summary, env values and secrets are
  * never written. The observer only writes when the agentic root directory
@@ -44,7 +44,7 @@ import { isEntrypoint } from "../../../core/entrypoint.ts"
  * project dir) overrides it.
  */
 export function resolveObserverDir(env: NodeJS.ProcessEnv, input: ObserverHookInput): string | null {
-  // Project root, never the session's current cwd (Dispatch b7d15add).
+  // Project root, never the session's current cwd.
   const projectDir = resolveProjectRoot(typeof input.cwd === "string" ? input.cwd : null, env)
   if (!projectDir) return null
   const override = env.NEXUS_AGENTIC_ROOT

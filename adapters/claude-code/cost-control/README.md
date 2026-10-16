@@ -1,9 +1,8 @@
 # nexus-cost-control (Claude Code adapter)
 
-Claude Code hook adapter for `nexus-cost-control`, part of the ADR-C05
-core/adapters restructure (Track B2, Dispatch `dc5fdf9a`). This is the last
-plugin in the Track B2 scope (`600-attribution-headers` is explicitly
-excluded per ADR-C08).
+Claude Code hook adapter for `nexus-cost-control`, part of the
+core/adapters restructure (`600-attribution-headers` is explicitly
+excluded and has no Claude Code adapter).
 
 **Capability matrix status:** `partial` (see `cost_control` entry in
 `capability-matrix.v1.json`). Claude Code has no idle-detection event (no
@@ -39,8 +38,8 @@ formatting, and the Nexus API call live in
    `core/claude-transcript.ts` helper in a follow-up if a third plugin needs
    it.
 5. **Native aggregation is the default, zero-config path; Helicone is
-   optional enrichment (`cost_source: "runtime" | "helicone"`).** Per
-   ADR-0040 (nexus-app), `queryHeliconeSession` is only consulted when
+   optional enrichment (`cost_source: "runtime" | "helicone"`).** By
+   design, `queryHeliconeSession` is only consulted when
    `HELICONE_API_KEY` is configured, and is not a gating requirement for
    `handleStop` to run. When Helicone is absent, not configured, or
    configured but returns no data (e.g. Claude Max sessions, which talk
@@ -54,9 +53,8 @@ formatting, and the Nexus API call live in
    entry (`cost_source: "helicone"`, real `cost_usd`) is preferred. If no
    assistant messages are found in the transcript either, no entry is
    written. `v1.1.0` briefly inverted this precedence (gated everything on
-   `HELICONE_API_KEY` being configured) -- a drift from ADR-0040 introduced
-   during the ADR-C05 restructure, corrected in `v1.2.0`. See Dispatch
-   `515186c1` and `6298a740`.
+   `HELICONE_API_KEY` being configured) -- a drift introduced during the
+   core/adapters restructure, corrected in `v1.2.0`.
 
 ## Native aggregation vs. Helicone enrichment
 

@@ -2,7 +2,7 @@ import { appendFileSync, mkdirSync, renameSync, statSync } from "node:fs"
 import { join } from "node:path"
 
 /**
- * Shared file-based logger factory (ADR-C05 core module).
+ * Shared file-based logger factory (core module).
  *
  * Every Nexus runtime plugin writes debug logs to `.nexus/<name>.log` inside
  * the project directory. This was previously reimplemented per-plugin; it is

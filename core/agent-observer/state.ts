@@ -3,7 +3,7 @@ import { join } from "node:path"
 import { initialObserverState, type ObserverState } from "./types.ts"
 
 /**
- * Observer state persistence (ADR-0120). Lives next to `events.jsonl`
+ * Observer state persistence. Lives next to `events.jsonl`
  * (`<agentic_root>/claude/observer/state.json`) rather than in `.nexus/` via
  * core/state-store.ts, so the whole observer footprint stays in one
  * directory. Writes go to a temp file and are renamed into place, so a

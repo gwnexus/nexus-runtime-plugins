@@ -5,7 +5,7 @@ import type { OriginalStore } from "./store.ts"
 import type { StructuredLogger } from "./structured-logger.ts"
 
 /**
- * Runtime-agnostic interception engine (ADR-C05 core module).
+ * Runtime-agnostic interception engine (core module).
  *
  * Both adapters normalize their runtime's tool-output shape into plain text
  * first (OpenCode: `output.output` string or MCP `content[]`; Claude Code:

@@ -5,7 +5,7 @@ import { formatBanner, formatSystemPromptContext } from "../../../core/routing-g
 import type { AgentInfo, ProviderCatalog, RoutingWarning } from "../../../core/routing-guard/types.ts"
 
 /**
- * Nexus Routing Guard — OpenCode adapter (ADR-C05, Track B2).
+ * Nexus Routing Guard: OpenCode adapter.
  *
  * Wires the runtime-agnostic core/routing-guard detection + formatting logic
  * to OpenCode's `experimental.chat.system.transform` (best-effort in-session

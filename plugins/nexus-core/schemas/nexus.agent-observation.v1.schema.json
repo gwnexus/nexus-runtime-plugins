@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/gwnexus/nexus-runtime-plugins/plugins/nexus-core/schemas/nexus.agent-observation.v1.schema.json",
   "title": "nexus.agent-observation.v1",
-  "description": "One line of <agentic_root>/claude/observer/events.jsonl, written by the nexus-agent-observer Claude Code hook adapter (ADR-0120). One record per hook event. Values that are not available are null. Never contains tool inputs/outputs, prompt text beyond the 120-char task summary, env values or secrets.",
+  "description": "One line of <agentic_root>/claude/observer/events.jsonl, written by the nexus-agent-observer Claude Code hook adapter. One record per hook event. Values that are not available are null. Never contains tool inputs/outputs, prompt text beyond the 120-char task summary, env values or secrets.",
   "type": "object",
   "additionalProperties": false,
   "required": [

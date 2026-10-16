@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Nexus Headroom Intercept — Claude Code adapter (ADR-C05, Track B2, Dispatch dc5fdf9a).
+ * Nexus Headroom Intercept: Claude Code adapter.
  *
  * Capability matrix: `headroom_intercept` = "full" for Claude Code via
  * `PostToolUse` returning `hookSpecificOutput.updatedToolOutput`. All
@@ -9,8 +9,7 @@
  * adapter; this file only handles Claude Code-specific concerns.
  *
  * VERIFIED against the official Claude Code hooks reference
- * (code.claude.com/docs/en/hooks) on 2026-09-20, see Dispatch `dc5fdf9a`
- * reply from nexus-app: `hookSpecificOutput.updatedToolOutput` is the
+ * (code.claude.com/docs/en/hooks) on 2026-09-20: `hookSpecificOutput.updatedToolOutput` is the
  * correct field to REPLACE tool output (this plugin's actual need —
  * compression); `additionalContext` is a different field that only ADDS
  * supplementary text alongside the original result, so it does not do what
@@ -57,14 +56,14 @@
  *     equivalent (see capability-matrix `cost_control` entry for the same
  *     gap in a different plugin). Metrics are persisted to
  *     `.nexus/headroom-metrics-state.json` between invocations, accumulated
- *     cumulatively across the whole session (Fix §3, Dispatch 0e38cf7b: a
+ *     cumulatively across the whole session (fix §3: a
  *     new `session_id` reported by the hook input is the only reset
  *     trigger; the `Stop` hook fires after every assistant turn, not once
  *     per session, so resetting on every `Stop` previously caused
  *     `nexus-cli` to observe only the last turn's numbers), and flushed as a
  *     cumulative `session_summary` log line on every `Stop`.
  *
- * Fix log (Dispatch 0e38cf7b, 2026-09-24):
+ * Fix log (2026-09-24):
  *   §1 Tool-name mismatch — `mcp__<server>__<tool>` MCP tool names are now
  *      normalized to the core policy table's naming convention
  *      (`normalizeClaudeToolName`) before policy lookup.
@@ -148,7 +147,7 @@ interface NormalizedResult {
 
 /**
  * Normalize Claude Code's MCP tool name into the core policy table's naming
- * convention (Fix §1, Dispatch 0e38cf7b). Claude Code passes MCP tools as
+ * convention (fix §1). Claude Code passes MCP tools as
  * `mcp__<server>__<tool>` (e.g. `mcp__nexus__kb_memory`,
  * `mcp__nexus-headroom__headroom_retrieve`), while the core policy table
  * (`core/headroom-intercept/policies.ts`) only knows OpenCode-style names
@@ -178,7 +177,7 @@ function fromContentBlocks(blocks: unknown[], sourceShape: SourceShape): Normali
 /**
  * Normalize Claude Code's tool_response shape into plain text for the core engine.
  *
- * Captured live (Claude Code 2.1.x, Dispatch 1bc7ff92, 2026-09-24): for MCP
+ * Captured live (Claude Code 2.1.x, 2026-09-24): for MCP
  * tools, PostToolUse `tool_response` is a BARE ARRAY of content blocks
  * (`[{ type: "text", text }]`), not `{ content: [...] }`. The object forms are
  * still accepted defensively. Any non-text block marks the response
@@ -282,8 +281,7 @@ async function getGate(directory: string, logger: StructuredLogger): Promise<Gat
 }
 
 /**
- * Load accumulated metrics for the current session (Fix §3, Dispatch
- * 0e38cf7b). Claude Code fires `Stop` after every assistant turn, not once
+ * Load accumulated metrics for the current session (fix §3). Claude Code fires `Stop` after every assistant turn, not once
  * per session, so metrics must persist across turns and only reset when the
  * `session_id` reported by the hook input actually changes (a genuinely new
  * session starting), not on every `Stop`.
@@ -423,7 +421,7 @@ async function main(): Promise<void> {
   }
 
   // Anchor every .nexus/ read and write at the project root, not the session's
-  // current cwd (Dispatch b7d15add); skip entirely when no root resolves.
+  // current cwd; skip entirely when no root resolves.
   const directory = resolveProjectRoot(input.cwd)
   if (!directory) process.exit(0)
   input = { ...input, cwd: directory }

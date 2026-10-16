@@ -1,7 +1,7 @@
 import type { NexusConfigSource } from "../nexus-config.ts"
 
 /**
- * nexus-headroom-intercept core types (ADR-C05 core module).
+ * nexus-headroom-intercept core types (core module).
  * Runtime-agnostic — shared by the OpenCode and Claude Code adapters.
  */
 

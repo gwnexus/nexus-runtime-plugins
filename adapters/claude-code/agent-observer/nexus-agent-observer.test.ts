@@ -418,7 +418,7 @@ describe("agent-observer: adapter I/O", () => {
     expect(resolveObserverDir({ CLAUDE_PROJECT_DIR: "/p", NEXUS_AGENTIC_ROOT: "agentic" }, {})).toBe(
       "/p/agentic/claude/observer",
     )
-    // Bare cwd outside any git checkout is not a project root (Dispatch b7d15add).
+    // Bare cwd outside any git checkout is not a project root.
     expect(resolveObserverDir({}, { cwd: "/c" })).toBeNull()
   })
 

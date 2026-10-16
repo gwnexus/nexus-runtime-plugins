@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * Builds the `nexus-core` Claude Code plugin's hook bundles (ADR-0117,
- * nexus-app, Dispatch 0e38cf7b Part 2).
+ * Builds the `nexus-core` Claude Code plugin's hook bundles.
  *
  * Plugins install via git, and TypeScript source is not directly executable
  * by Claude Code's `command`-type hooks, so each Claude Code

@@ -2,7 +2,7 @@ import { writeFileSync, readFileSync, appendFileSync, mkdirSync, existsSync, sta
 import { join } from "node:path"
 
 /**
- * Structured JSONL logger (ADR-C05 core module) — runtime-agnostic.
+ * Structured JSONL logger (core module), runtime-agnostic.
  * Writes rotated, permission-locked JSONL debug/audit logs to
  * `.nexus/headroom-intercept.jsonl`. Identical behavior to the original
  * plugin's StructuredLogger; only the module boundary moved.

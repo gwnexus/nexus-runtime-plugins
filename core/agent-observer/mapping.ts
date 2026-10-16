@@ -1,5 +1,5 @@
 /**
- * nexus-agent-observer event mapping (ADR-0120, Dispatch 34a59203).
+ * nexus-agent-observer event mapping.
  *
  * Pure(ish) translation of one Claude Code hook payload into one
  * `nexus.agent-observation.v1` record, updating the persisted observer state

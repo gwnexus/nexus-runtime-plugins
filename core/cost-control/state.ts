@@ -12,7 +12,7 @@ export function tryParseJson(str: string): Record<string, unknown> | null {
 
 /**
  * Extract Nexus session/project state from a normalized list of tool
- * invocations (ADR-C05 core module) — runtime-agnostic.
+ * invocations (core module), runtime-agnostic.
  */
 export function extractNexusState(calls: NormalizedToolCall[], onDebug?: (message: string) => void): NexusState {
   const state: NexusState = {}

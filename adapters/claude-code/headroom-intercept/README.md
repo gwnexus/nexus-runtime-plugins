@@ -1,7 +1,7 @@
 # nexus-headroom-intercept (Claude Code adapter)
 
-Claude Code hook adapter for `nexus-headroom-intercept`, part of the ADR-C05
-core/adapters restructure (Track B2, Dispatch `dc5fdf9a`).
+Claude Code hook adapter for `nexus-headroom-intercept`, part of the
+core/adapters restructure.
 
 **Capability matrix status:** `full` (see `headroom_intercept` entry in
 `capability-matrix.v1.json`) — Claude Code's `PostToolUse` hook natively
@@ -58,7 +58,7 @@ built-in tool, so a plain-string `updatedToolOutput` is always safe here. If
 the policy table is ever extended to compress a built-in tool's output, that
 entry must preserve the tool's native output shape instead.
 
-## Confirmed MCP `tool_response` shape (2026-09-24, Dispatch 1bc7ff92)
+## Confirmed MCP `tool_response` shape (2026-09-24)
 
 Captured live from a real Claude Code session (structure only, no content):
 for MCP tools, `PostToolUse` delivers `tool_response` as a **bare array of
@@ -102,7 +102,7 @@ Add to `.claude/settings.json`:
  }
 ```
 
-**Important (Fix §1, Dispatch `0e38cf7b`):** the `matcher` regex must include the
+**Important:** the `matcher` regex must include the
 `mcp__<server>__` prefix forms, not just `nexus_.*|headroom_.*`. Claude Code
 names MCP tools `mcp__<server>__<tool>` (for example `mcp__nexus__kb_memory`),
 so a matcher of only `nexus_.*|headroom_.*` never fires for real MCP tool

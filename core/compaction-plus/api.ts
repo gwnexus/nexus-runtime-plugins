@@ -1,8 +1,8 @@
 import type { NexusConfig } from "./types.ts"
 
 /**
- * Append a compaction entry to the Nexus session via REST API (ADR-C05 core
- * module) — runtime-agnostic (fetch only). `onLog` lets each adapter route
+ * Append a compaction entry to the Nexus session via REST API (core
+ * module), runtime-agnostic (fetch only). `onLog` lets each adapter route
  * the request/response trace to its own logger.
  */
 export async function appendCompactionEntry(

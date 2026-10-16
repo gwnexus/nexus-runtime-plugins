@@ -5,7 +5,7 @@ An [OpenCode](https://opencode.ai) plugin that preserves [Nexus](https://nexus.g
 **Current version:** `v1.8.3`  
 **Requires:** Nexus MCP server (`NEXUS_API_URL`, `NEXUS_PRIVATE_TOKEN`)
 
-> Migrated to the ADR-C05 `core/` + `adapters/` structure (Track B2). State
+> Migrated to the `core/` + `adapters/` structure. State
 > extraction, context building, and the Nexus API call now live in
 > [`core/compaction-plus/`](../../../core/compaction-plus), shared with the
 > [Claude Code adapter](../../claude-code/compaction-plus). This file

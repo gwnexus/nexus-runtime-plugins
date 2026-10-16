@@ -2,7 +2,7 @@ import type { HeliconeConfig, HeliconeSessionCost } from "./types.ts"
 
 /**
  * Query the Helicone API for aggregated usage data for a specific Nexus
- * session (ADR-C05 core module) — runtime-agnostic (fetch only). Helicone
+ * session (core module), runtime-agnostic (fetch only). Helicone
  * groups requests by session via the `Helicone-Session-Id` header that
  * agents inject on each request.
  *

@@ -1,7 +1,6 @@
 # nexus-agent-observer (Claude Code adapter)
 
-Claude Code hook adapter that feeds the Agent Observability pane (ADR-0120,
-Dispatch `34a59203`, nexus-app). It appends one `nexus.agent-observation.v1`
+Claude Code hook adapter that feeds the Agent Observability pane. It appends one `nexus.agent-observation.v1`
 JSON line per hook event to
 
 ```

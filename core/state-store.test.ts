@@ -25,7 +25,7 @@ describe("state-store (real fs, no mocks)", () => {
     expect(loaded).toEqual({ count: 1, name: "a", extra: true })
   })
 
-  it("round-trips a bare string state without corrupting it (Fix, Dispatch 0e38cf7b review)", () => {
+  it("round-trips a bare string state without corrupting it", () => {
     saveState(dir, "session-id.json", "s-1")
     const loaded = loadState<string | null>(dir, "session-id.json", null)
     expect(loaded).toBe("s-1")

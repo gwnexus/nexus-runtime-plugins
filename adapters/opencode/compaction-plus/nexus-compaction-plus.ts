@@ -6,7 +6,7 @@ import { appendCompactionEntry } from "../../../core/compaction-plus/api.ts"
 import type { NormalizedToolCall } from "../../../core/compaction-plus/types.ts"
 
 /**
- * Nexus Compaction Plus — OpenCode adapter (ADR-C05, Track B2).
+ * Nexus Compaction Plus: OpenCode adapter.
  *
  * Wires the runtime-agnostic core/compaction-plus logic to OpenCode's
  * `experimental.session.compacting` (pre-compaction context injection) and

@@ -3,8 +3,8 @@ import type { HeliconeSessionCost } from "./types.ts"
 /**
  * Token/message usage aggregated directly from a runtime's own transcript or
  * message history, used as a fallback when Helicone has no record of a
- * session (ADR-C05 core module, Dispatch 515186c1). No cost figure is
- * derivable from this source — only Helicone knows the metered dollar cost.
+ * session (core module). No cost figure is
+ * derivable from this source; only Helicone knows the metered dollar cost.
  */
 export interface RuntimeUsage {
   tokensInput: number

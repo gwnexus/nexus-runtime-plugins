@@ -4,11 +4,11 @@
 
 The Claude Code distribution of this repo's runtime plugins
 (`session-guard`, `headroom-intercept`, `compaction-plus`, `routing-guard`,
-`cost-control`, and the Claude Code-only `agent-observer`), packaged as a single installable Claude Code plugin per
-ADR-0117 (nexus-app, accepted), plus four agents for
+`cost-control`, and the Claude Code-only `agent-observer`), packaged as a single installable Claude Code plugin,
+plus four agents for
 architecture/code/security/documentation review.
 
-`600-attribution-headers` is intentionally excluded (ADR-C08) and has no
+`600-attribution-headers` is intentionally excluded and has no
 Claude Code adapter.
 
 ## Install
@@ -70,7 +70,7 @@ npm run build:nexus-core-plugin
 CI fails the build (`npm run verify:nexus-core-plugin`) if the committed
 bundles have drifted from source.
 
-## Agent observer (ADR-0120)
+## Agent observer
 
 `agent-observer` writes one `nexus.agent-observation.v1` line per hook event
 to `.nexus/claude/observer/events.jsonl` for `nexus status --agents`. It is
@@ -98,7 +98,7 @@ write Nexus artifacts (reviews, ADRs, plans) belong to the project's own
 Use `claude plugin tag` (Claude Code 2.1.281+) to cut a release -- it creates
 a `{name}--v{version}` tag (`nexus-core--vX.Y.Z`, matching `plugin.json`'s
 `version` field) and validates `plugin.json` against the marketplace entry
-before tagging. Do not hand-create tags in a different format; nexus-app
+before tagging. Do not hand-create tags in a different format; the Nexus platform
 pins `extraKnownMarketplaces.gatewarden-nexus.source.ref` to this exact tag
 format. Users can pin an install to a specific release the same way:
 `/plugin marketplace add gwnexus/nexus-runtime-plugins --ref nexus-core--vX.Y.Z`.

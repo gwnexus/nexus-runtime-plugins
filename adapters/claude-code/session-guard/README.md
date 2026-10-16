@@ -1,7 +1,7 @@
 # nexus-session-guard (Claude Code adapter)
 
-Claude Code hook adapter for `nexus-session-guard`, part of the ADR-C05
-core/adapters restructure (Track B2, Dispatch `dc5fdf9a`).
+Claude Code hook adapter for `nexus-session-guard`, part of the
+core/adapters restructure.
 
 **Capability matrix status:** `partial` (see `session_guard` entry in
 `capability-matrix.v1.json`). Event granularity/ordering differs from the
@@ -75,7 +75,7 @@ correct field for both `PostToolUse` and `UserPromptSubmit`, verified
 against the official Claude Code hooks reference. No changes needed for
 this adapter.
 
-**Fixed (Dispatch `0e38cf7b` review, 2026-09-24):** Claude Code sends Nexus
+**Fixed (2026-09-24):** Claude Code sends Nexus
 MCP tool calls as `mcp__nexus__task_create`, `mcp__nexus__adr_create`, etc.,
 not the OpenCode-style `nexus_task_create` names this adapter's matcher and
 internal trigger checks originally expected -- the same tool-name-mismatch

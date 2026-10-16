@@ -1,7 +1,7 @@
 import type { Policy, PolicyAction } from "./types.ts"
 
 /**
- * Policy table (ADR-C05 core module) — runtime-agnostic. Identical for the
+ * Policy table (core module), runtime-agnostic. Identical for the
  * OpenCode and Claude Code adapters: which Nexus MCP tools get compressed,
  * passed through, or skipped, and at what token threshold.
  */

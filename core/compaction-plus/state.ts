@@ -12,7 +12,7 @@ export function tryParseJson(str: string): Record<string, unknown> | null {
 
 /**
  * Extract Nexus session/project state from a normalized list of tool
- * invocations (ADR-C05 core module) — runtime-agnostic. Both adapters
+ * invocations (core module), runtime-agnostic. Both adapters
  * convert their own transcript format (OpenCode message parts vs. Claude
  * Code transcript JSONL) into `NormalizedToolCall[]` before calling this.
  */

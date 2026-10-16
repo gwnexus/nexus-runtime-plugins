@@ -2,8 +2,8 @@ import type { NexusConfig, HeliconeSessionCost } from "./types.ts"
 import { formatCostSummary } from "./format.ts"
 
 /**
- * Append a cost-snapshot entry to the Nexus session via REST API (ADR-C05
- * core module) — runtime-agnostic (fetch only). Unchanged from the original
+ * Append a cost-snapshot entry to the Nexus session via REST API
+ * (core module), runtime-agnostic (fetch only). Unchanged from the original
  * plugin.
  */
 export async function appendCostEntry(

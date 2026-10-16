@@ -1,7 +1,7 @@
 import type { NexusConfigSource } from "../nexus-config.ts"
 
 /**
- * nexus-cost-control core types (ADR-C05 core module) — runtime-agnostic.
+ * nexus-cost-control core types (core module), runtime-agnostic.
  */
 
 export interface NexusConfig {

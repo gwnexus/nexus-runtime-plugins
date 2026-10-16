@@ -5,13 +5,13 @@
 [![Node.js 22+](https://img.shields.io/badge/node-22%2B-green.svg)](https://nodejs.org)
 [![OpenCode 1.14+](https://img.shields.io/badge/opencode-1.14%2B-black.svg)](https://opencode.ai)
 
-OpenCode plugins for the [Nexus](https://nexus.gatewarden.eu) platform. Under
-ADR-C05, this repo has migrated to a runtime-neutral `core/` + `adapters/`
+OpenCode plugins for the [Nexus](https://nexus.gatewarden.eu) platform. This
+repo has migrated to a runtime-neutral `core/` + `adapters/`
 structure so plugins can also run under Claude Code; `nexus-session-guard`,
 `nexus-headroom-intercept`, `nexus-compaction-plus`, `nexus-routing-guard`,
 and `nexus-cost-control` are migrated (OpenCode + Claude Code adapters both
 available for each). `nexus-attribution-headers` remains OpenCode-only by
-design (ADR-C08).
+design.
 
 These plugins extend the coding agent with deep Nexus integration. Each plugin
 targets a specific problem in the agent lifecycle: session continuity across
@@ -38,7 +38,7 @@ auto-discovery mechanism (`.opencode/plugins/`). Migrated plugins (see
 
 **`nexus-core` · [`plugins/nexus-core`](./plugins/nexus-core) · marketplace `gatewarden-nexus`**
 
-Per ADR-0117 (nexus-app, accepted), the five migrated plugins are also
+The five migrated plugins are also
 distributed as a single installable Claude Code plugin, `nexus-core`, via a
 `.claude-plugin/marketplace.json` at the repo root:
 
@@ -61,7 +61,7 @@ full plugin/marketplace mechanism.
 
 **`v1.8.4` · [`adapters/opencode/compaction-plus`](./adapters/opencode/compaction-plus) (OpenCode) · [`adapters/claude-code/compaction-plus`](./adapters/claude-code/compaction-plus) (Claude Code)**
 
-> Migrated to the ADR-C05 `core/` + `adapters/` structure. State extraction,
+> Migrated to the `core/` + `adapters/` structure. State extraction,
 > context building, and the Nexus API call live in
 > [`core/compaction-plus/`](./core/compaction-plus), shared between both
 > adapters. The Claude Code adapter is a `partial`-parity plugin per
@@ -92,8 +92,8 @@ This plugin solves that by hooking directly into the compaction lifecycle:
 
 **`v1.2.3` · [`adapters/opencode/cost-control`](./adapters/opencode/cost-control) (OpenCode) · [`adapters/claude-code/cost-control`](./adapters/claude-code/cost-control) (Claude Code)**
 
-> Migrated to the ADR-C05 `core/` + `adapters/` structure (Track B2, the
-> last plugin in this restructure pass). Credential resolution, state
+> Migrated to the `core/` + `adapters/` structure (the last plugin in this
+> restructure pass). Credential resolution, state
 > extraction, the Helicone client, formatting, and the Nexus API call live
 > in [`core/cost-control/`](./core/cost-control), shared between both
 > adapters. The Claude Code adapter is `partial` parity per
@@ -128,7 +128,7 @@ removing the Helicone dependency.
 
 **`v0.5.20` · [`adapters/opencode/headroom-intercept`](./adapters/opencode/headroom-intercept) (OpenCode) · [`adapters/claude-code/headroom-intercept`](./adapters/claude-code/headroom-intercept) (Claude Code)**
 
-> Migrated to the ADR-C05 `core/` + `adapters/` structure. All policy,
+> Migrated to the `core/` + `adapters/` structure. All policy,
 > compression, cache, and credential-resolution logic lives in
 > [`core/headroom-intercept/`](./core/headroom-intercept), shared between
 > both adapters. The Claude Code adapter is a `full`-parity target per
@@ -167,8 +167,8 @@ and compression profile. Originals are retrievable via the plugin's own
 
 **`v1.2.1` · [`adapters/opencode/session-guard`](./adapters/opencode/session-guard) (OpenCode) · [`adapters/claude-code/session-guard`](./adapters/claude-code/session-guard) (Claude Code)**
 
-> This plugin has been migrated to the ADR-C05 `core/` + `adapters/` structure
-> as the Track B2 pilot. Shared trigger-detection logic lives in
+> This plugin has been migrated to the `core/` + `adapters/` structure
+> as the pilot. Shared trigger-detection logic lives in
 > `core/session-guard/logic.ts`; the OpenCode and Claude Code adapters each
 > wire it to their respective runtime hooks.
 
@@ -189,14 +189,13 @@ before proceeding.
 - **Bash heuristic** -- read-only commands (`cat`, `grep`, `git status`,
   `ls`, `npm ls`, etc.) are excluded from triggers to avoid false positives.
 
-**Required:** Nexus MCP server (session must be active)  
-**Ref:** ADR-0066
+**Required:** Nexus MCP server (session must be active)
 
 ## Routing Guard
 
 **`v1.0.0` · [`adapters/opencode/routing-guard`](./adapters/opencode/routing-guard) (OpenCode) · [`adapters/claude-code/routing-guard`](./adapters/claude-code/routing-guard) (Claude Code)**
 
-> Migrated to the ADR-C05 `core/` + `adapters/` structure. The pure
+> Migrated to the `core/` + `adapters/` structure. The pure
 > divergence-detection function lives in
 > [`core/routing-guard/`](./core/routing-guard), shared between both
 > adapters. The Claude Code adapter is `partial` parity per
@@ -225,8 +224,7 @@ provider can be entirely valid while a single model id is wrong.
 - **Warning codes:** `unknown_provider` (provider absent from the instance
   catalog), `unknown_model` (provider present, model id not in its catalog).
 
-**Required:** none (no Nexus MCP session needed)  
-**Ref:** ADR-0001
+**Required:** none (no Nexus MCP session needed)
 
 ## Attribution Headers
 
@@ -247,8 +245,7 @@ This plugin closes that gap.
   which does not match the hook's documented TypeScript type (see the
   plugin README for the discrepancy). Never touches non-`nexus` providers.
 
-**Required:** none (no Nexus MCP session needed)  
-**Ref:** dispatch `5999b7d6` (NEXUS-APP)
+**Required:** none (no Nexus MCP session needed)
 
 ## Installation
 
@@ -289,7 +286,7 @@ nexus-runtime-plugins/
   600-attribution-headers/
     nexus-attribution-headers.ts -- plugin source
     README.md
-  core/                            -- ADR-C05: runtime-agnostic shared logic
+  core/                            -- runtime-agnostic shared logic
     logger.ts
     state-store.ts
     session-guard/
@@ -319,7 +316,7 @@ nexus-runtime-plugins/
       helicone.ts
       format.ts
       api.ts
-  adapters/                        -- ADR-C05: per-runtime hook wiring
+  adapters/                        -- per-runtime hook wiring
     opencode/
       session-guard/
         nexus-session-guard.ts
@@ -355,14 +352,13 @@ nexus-runtime-plugins/
 ```
 
 Session Guard, Headroom Intercept, Compaction Plus, Routing Guard, and Cost
-Control are the ADR-C05 Track B2 plugins migrated so far: out of their flat
+Control are the plugins migrated so far: out of their flat
 `400-session-guard/` / `300-headroom-intercept/` / `100-compaction-plus/` /
 `500-routing-guard/` / `200-cost-control/` directories into `core/` +
 `adapters/opencode/` + `adapters/claude-code/`. `600-attribution-headers` is
-explicitly not ported to Claude Code per ADR-C08 and stays as the only flat
-plugin directory. With Cost Control migrated, Track B2's per-plugin
-restructure is complete pending the follow-ups flagged in each adapter's
-README (see Dispatch `dc5fdf9a`, NEXUS-APP).
+explicitly not ported to Claude Code and stays as the only flat plugin
+directory. With Cost Control migrated, the per-plugin restructure is complete
+pending the follow-ups flagged in each adapter's README.
 
 ## Requirements
 

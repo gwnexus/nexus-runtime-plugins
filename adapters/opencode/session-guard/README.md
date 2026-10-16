@@ -92,10 +92,6 @@ transitions, Bash heuristics, MCP content shape, and user turn tracking.
 
 Debug logs are written to `.nexus/session-guard.log`.
 
-## Architecture Decision
-
-See ADR-0066: Session Guard Plugin (`d5f0735d-bc48-44c9-be2a-96753206a264`, NEXUS-APP).
-
 ## License
 
 Apache-2.0 — Copyright 2025-2026 RELICFROG Holding UG, contributed by Patrick Paechatz. See [LICENSE](../../../LICENSE).

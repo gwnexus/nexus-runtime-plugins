@@ -7,19 +7,18 @@ visibility inside [Nexus](https://nexus.gatewarden.eu) sessions.
 **Tracking mechanism:** native OpenCode message-data aggregation (zero-config, primary), with optional [Helicone](https://helicone.ai) enrichment  
 **Requires:** `NEXUS_API_URL`, `NEXUS_PRIVATE_TOKEN` (`HELICONE_API_KEY` is optional)
 
-> **Precedence (per ADR-0040, nexus-app):** native token-usage aggregation
+> **Precedence:** native token-usage aggregation
 > from OpenCode's own message data is the default, always-on,
 > zero-configuration path. Helicone is opt-in enrichment: if
 > `HELICONE_API_KEY` is configured, it is queried in addition and its
 > result (with a real metered `cost_usd`) is preferred when it returns
 > data. Earlier `v1.1.0` inverted this (gated everything on Helicone being
 > configured, with native aggregation only as a fallback for empty
-> Helicone responses) -- a drift from ADR-0040 introduced during the
-> ADR-C05 core/adapters restructure, corrected in `v1.2.2` per Dispatch
-> `6298a740`.
+> Helicone responses), a drift from the intended precedence introduced
+> during the core/adapters restructure, corrected in `v1.2.2`.
 
-> Migrated to the ADR-C05 `core/` + `adapters/` structure (Track B2, the
-> last plugin in this restructure pass). Credential resolution, state
+> Migrated to the `core/` + `adapters/` structure (the last plugin in this
+> restructure pass). Credential resolution, state
 > extraction, the Helicone client, formatting, and the Nexus API call now
 > live in [`core/cost-control/`](../../../core/cost-control), shared with
 > the [Claude Code adapter](../../claude-code/cost-control). This file
@@ -46,7 +45,7 @@ visibility inside [Nexus](https://nexus.gatewarden.eu) sessions.
    "runtime"` (native aggregation, `cost_usd: null`) or `cost_source:
    "helicone"` (metered, `cost_usd` is a real dollar figure), so downstream
    consumers can tell the two apart without inferring it from a missing
-   field. See Dispatch `515186c1` and `6298a740`.
+   field.
 
 ## How Helicone enrichment works (optional)
 

@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 // Only mock the network/credential-resolution boundary -- everything else
 // (state-store, OriginalStore, StructuredLogger) hits the real filesystem
-// under a temp directory. Fix, Dispatch 0e38cf7b review: the unit test file
+// under a temp directory. The unit test file
 // mocks core/state-store.ts with a plain in-memory Map, which does not
 // exercise the real `loadState()` object-spread bug (a bare JSON string like
 // `"s-1"` spread as `{ ...fallback, ..."s-1" }` silently corrupted into
@@ -45,7 +45,7 @@ describe("headroom-intercept Claude Code adapter — real filesystem integration
     rmSync(cwd, { recursive: true, force: true })
   })
 
-  it("accumulates cumulative compressions across post/stop/post/stop for the same session_id (Fix, Dispatch 0e38cf7b review)", async () => {
+  it("accumulates cumulative compressions across post/stop/post/stop for the same session_id", async () => {
     const prev = process.env.HEADROOM_MODE
     process.env.HEADROOM_MODE = "transform"
     try {

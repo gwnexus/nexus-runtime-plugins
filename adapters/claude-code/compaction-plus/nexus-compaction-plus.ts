@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 /**
- * Nexus Compaction Plus — Claude Code adapter (ADR-C05, Track B2, Dispatch dc5fdf9a).
+ * Nexus Compaction Plus: Claude Code adapter.
  *
  * Capability matrix: `compaction_plus` = "partial" for Claude Code.
  *
  * VERIFIED against the official Claude Code hooks reference
- * (code.claude.com/docs/en/hooks) on 2026-09-20, see Dispatch `dc5fdf9a`
- * reply from nexus-app:
+ * (code.claude.com/docs/en/hooks) on 2026-09-20:
  *
  *  - `PostCompact` supplies the generated summary in a field named
  *    `compact_summary`, NOT `summary` (bug fixed in this pass — the
@@ -30,9 +29,9 @@
  * `message.updated` diffing approach for the post-compaction recording
  * half of this plugin.
  *
- * STILL UNVERIFIED (per the dispatch: "please add an integration test
- * covering both modes and pin a minimum Claude Code version if behavior
- * differs"): interactive vs. `claude -p` (headless) hook behavior parity.
+ * STILL UNVERIFIED (open follow-up: an integration test covering both
+ * modes, and a pinned minimum Claude Code version if behavior differs):
+ * interactive vs. `claude -p` (headless) hook behavior parity.
  * This remains `partial` until that verification happens.
  *
  * Shared core logic (core/compaction-plus/*) is identical to the OpenCode
@@ -229,7 +228,7 @@ async function main(): Promise<void> {
   }
 
   // Anchor every .nexus/ read and write at the project root, not the session's
-  // current cwd (Dispatch b7d15add); skip entirely when no root resolves.
+  // current cwd; skip entirely when no root resolves.
   const directory = resolveProjectRoot(input.cwd)
   if (!directory) process.exit(0)
   input = { ...input, cwd: directory }

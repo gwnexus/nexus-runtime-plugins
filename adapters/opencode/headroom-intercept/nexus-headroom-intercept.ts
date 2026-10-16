@@ -15,7 +15,7 @@ import {
 } from "../../../core/headroom-intercept/engine.ts"
 
 /**
- * Nexus Headroom Intercept — OpenCode adapter (ADR-C05, Track B2).
+ * Nexus Headroom Intercept: OpenCode adapter.
  *
  * Wires the runtime-agnostic core/headroom-intercept engine to OpenCode's
  * `tool.execute.after` hook and the plugin-owned `nexus_headroom_intercept_retrieve`

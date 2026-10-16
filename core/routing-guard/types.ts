@@ -1,5 +1,5 @@
 /**
- * nexus-routing-guard core types (ADR-C05 core module) — runtime-agnostic.
+ * nexus-routing-guard core types (core module), runtime-agnostic.
  */
 
 export type RoutingWarning = {

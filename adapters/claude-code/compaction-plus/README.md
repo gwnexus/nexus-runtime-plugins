@@ -1,12 +1,11 @@
 # nexus-compaction-plus (Claude Code adapter)
 
-Claude Code hook adapter for `nexus-compaction-plus`, part of the ADR-C05
-core/adapters restructure (Track B2, Dispatch `dc5fdf9a`).
+Claude Code hook adapter for `nexus-compaction-plus`, part of the
+core/adapters restructure.
 
 **Capability matrix status:** `partial` (see `compaction_plus` entry in
 `capability-matrix.v1.json`). Confirmed against the official Claude Code
-hooks reference on 2026-09-20 (see Dispatch `dc5fdf9a` reply from
-nexus-app): `PostCompact` supplies the generated compact summary directly in
+hooks reference on 2026-09-20: `PostCompact` supplies the generated compact summary directly in
 a field named `compact_summary` (a bug where this adapter previously read
 `summary` was fixed in this pass) -- simpler than OpenCode's two-phase
 `session.compacted` + `message.updated` diffing approach for the

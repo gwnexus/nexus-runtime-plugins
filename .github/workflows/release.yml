@@ -65,9 +65,9 @@ jobs:
             rm -rf "$stagedir"
           }
 
-          # Individual plugin zip (plugin source + README) — remaining flat,
+          # Individual plugin zip (plugin source + README): remaining flat,
           # non-migrated plugin(s). 600-attribution-headers is explicitly not
-          # ported to Claude Code per ADR-C08 and stays flat indefinitely.
+          # ported to Claude Code and stays flat indefinitely.
           for dir in 600-attribution-headers; do
             plugin_name=$(basename "$dir")
             zip -j "dist/${plugin_name}.zip" "${dir}"/*.ts "${dir}"/README.md
@@ -132,7 +132,7 @@ jobs:
             core/logger.ts core-logger.ts \
             core/state-store.ts core-state-store.ts
 
-          # Claude Code-only adapter (ADR-0120): no OpenCode counterpart. Ships
+          # Claude Code-only adapter: no OpenCode counterpart. Ships
           # the built single-file bundle too, for claude_hook_adapters.
           stage dist/agent-observer.zip \
             adapters/claude-code/agent-observer/nexus-agent-observer.ts claude-code-nexus-agent-observer.ts \

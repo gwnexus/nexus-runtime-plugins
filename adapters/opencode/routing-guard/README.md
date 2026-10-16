@@ -7,9 +7,8 @@ catalog of the running OpenCode instance, for the
 
 **Current version:** `v1.0.1`
 **Requires:** none beyond `PluginInput.client` (no Nexus MCP session required)
-**Ref:** ADR-0001, dispatch `46bc744a-17c6-4aa1-9d8f-7d6f5ad881a4` (NEXUS-APP)
 
-> Migrated to the ADR-C05 `core/` + `adapters/` structure (Track B2). The
+> Migrated to the `core/` + `adapters/` structure. The
 > pure divergence-detection function and banner/context formatters live in
 > [`core/routing-guard/`](../../../core/routing-guard), shared with the
 > [Claude Code adapter](../../claude-code/routing-guard). This file documents
@@ -64,8 +63,7 @@ session-start warning with three combined mechanisms:
    It cannot be rephrased or dropped by the model, at the cost of firing on
    the first tool call rather than literally at session start.
 
-Mechanism 3 is the deterministic backstop for mechanism 2. See ADR-0001 for
-the full reasoning and trade-offs.
+Mechanism 3 is the deterministic backstop for mechanism 2.
 
 ## Hard constraints
 
@@ -128,10 +126,10 @@ formatting).
 
 Debug logs are written to `.nexus/routing-guard.log`.
 
-## Architecture Decision
+## Design
 
-See ADR-0001: Routing guard surfacing mechanism (system prompt plus one-shot
-tool-output banner).
+The guard surfaces divergence through two channels: the system prompt, and a
+one-shot banner on the first tool output as the deterministic backstop.
 
 ## License
 

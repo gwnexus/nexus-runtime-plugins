@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { resolveProjectRoot, findGitTopLevel } from "./project-root.ts"
 
-describe("resolveProjectRoot (Dispatch b7d15add)", () => {
+describe("resolveProjectRoot", () => {
   let root: string
   let sub: string
 

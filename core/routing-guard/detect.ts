@@ -2,7 +2,7 @@ import type { AgentInfo, ProviderCatalog, RoutingWarning } from "./types.ts"
 
 /**
  * Compare the resolved agent model routing against a provider/model catalog
- * (ADR-C05 core module) — runtime-agnostic pure function, unchanged from the
+ * (core module), runtime-agnostic pure function, unchanged from the
  * original plugin.
  *
  * - `unknown_provider`: the agent's providerID is not in the catalog at all.

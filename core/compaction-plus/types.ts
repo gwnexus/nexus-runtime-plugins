@@ -1,7 +1,7 @@
 import type { NexusConfigSource } from "../nexus-config.ts"
 
 /**
- * nexus-compaction-plus core types (ADR-C05 core module) — runtime-agnostic.
+ * nexus-compaction-plus core types (core module), runtime-agnostic.
  */
 
 export interface NexusState {

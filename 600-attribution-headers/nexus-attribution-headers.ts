@@ -29,8 +29,7 @@ const PRIMARY_AGENT_PREFIX = "nexus-"
  * `@opencode-ai/plugin`. At runtime `input.provider` is the flat `Provider`
  * object directly (`{ id, source, name, env, options, models }`). Verified
  * empirically against `@opencode-ai/plugin`/`@opencode-ai/sdk` 1.17.18,
- * OpenCode 1.18.27 — see dispatch `5999b7d6-8b1f-4b1a-8101-ce7f5d6695df`
- * (NEXUS-APP). Using the documented `.info.id` path here would make the
+ * OpenCode 1.18.27. Using the documented `.info.id` path here would make the
  * provider guard silently never match.
  */
 type RuntimeProvider = {
@@ -73,8 +72,8 @@ export function computeAttributionHeaders(agent: string | undefined | null): Rec
  * `route_decision_events` can attribute usage to a session and actor.
  *
  * These headers are attribution-only. They are never used for routing or
- * auth on the gateway side (see dispatch `16973ead`, 2026-09-04, which
- * specified the gateway side of this contract).
+ * auth on the gateway side; the gateway side of this contract was specified
+ * on 2026-09-04.
  *
  * Scoped strictly to `provider.id === "nexus"` — never touches requests to
  * any other configured provider (Anthropic, OpenAI, GitHub Copilot, etc).

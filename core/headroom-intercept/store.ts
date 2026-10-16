@@ -13,9 +13,9 @@ import { join } from "node:path"
 import { contentHash, estimateTokens } from "./compression.ts"
 
 /**
- * Disk-backed original-content cache (ADR-C05 core module) — runtime-agnostic.
+ * Disk-backed original-content cache (core module), runtime-agnostic.
  * TTL eviction, quota, permissions, .gitignore, project-namespacing, atomic
- * writes. Unchanged behavior from the original plugin during the ADR-C05
+ * writes. Unchanged behavior from the original plugin during the
  * core extraction; only the module boundary moved.
  */
 

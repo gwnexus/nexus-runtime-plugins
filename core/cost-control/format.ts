@@ -2,7 +2,7 @@ import type { HeliconeSessionCost } from "./types.ts"
 
 /**
  * Format a HeliconeSessionCost as a human-readable Nexus session entry
- * (ADR-C05 core module) — runtime-agnostic, unchanged from the original
+ * (core module), runtime-agnostic, unchanged from the original
  * plugin.
  */
 export function formatCostSummary(cost: HeliconeSessionCost, pluginVersion: string): string {

@@ -2,7 +2,7 @@ import { appendFileSync, mkdirSync, renameSync, statSync } from "node:fs"
 import { join } from "node:path"
 
 /**
- * Append-only JSONL writer with single-generation size rotation (ADR-0120).
+ * Append-only JSONL writer with single-generation size rotation.
  *
  * `events.jsonl` is rotated to `events.1.jsonl` (overwriting any previous
  * rotation, so exactly one old generation is kept) once it reaches

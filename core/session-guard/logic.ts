@@ -1,5 +1,5 @@
 /**
- * nexus-session-guard core logic (ADR-C05 core module).
+ * nexus-session-guard core logic (core module).
  *
  * Runtime-agnostic state machine and trigger detection shared by the
  * OpenCode adapter (in-memory state, long-lived plugin instance) and the

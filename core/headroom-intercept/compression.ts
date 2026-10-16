@@ -2,7 +2,7 @@ import { createHash } from "node:crypto"
 import type { CompressionProfile } from "./types.ts"
 
 /**
- * Pure text compression logic (ADR-C05 core module) — runtime-agnostic.
+ * Pure text compression logic (core module), runtime-agnostic.
  * No fs/network access; safe to unit test in isolation and share verbatim
  * between the OpenCode and Claude Code adapters.
  */
@@ -79,7 +79,7 @@ export function retrievalFooter(hash: string): string {
  * Apply the per-profile output budget and wrap the result in the structured
  * output contract with correct trust boundaries. See original plugin history
  * (v0.5.x fixes 2.2-3.3) for the rationale behind the exact envelope shape;
- * unchanged during the ADR-C05 core extraction.
+ * unchanged during the core extraction.
  */
 export function applyOutputBudget(
   content: string,
