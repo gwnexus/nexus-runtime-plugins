@@ -79,6 +79,11 @@ describe("session-guard bundle: session-start release-line nudge", () => {
       {
         url: "/api/mcp/sessions",
         auth: "Bearer test-token",
+        body: { action: "session_list", project_id: "proj-1", release_line: "0.18.0" },
+      },
+      {
+        url: "/api/mcp/sessions",
+        auth: "Bearer test-token",
         body: { action: "session_list", project_id: "proj-1" },
       },
     ])
@@ -89,6 +94,7 @@ describe("session-guard bundle: session-start release-line nudge", () => {
     const { code, stdout } = await run("staging/release-0.18.0")
     expect(code).toBe(0)
     expect(stdout).toBe("")
+    expect(requests).toHaveLength(1)
   })
 
   it("does not call the API on a non-release branch or when disabled", async () => {

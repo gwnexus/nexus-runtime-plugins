@@ -109,7 +109,20 @@ describe("readGitBranch and checkReleaseLine", () => {
     gitHead(`ref: refs/heads/${BRANCH}\n`)
     const r = await checkReleaseLine(root, env, lookup, config)
     expect(r?.action).toBe("nudge")
-    expect(lookup).toHaveBeenCalledWith(expect.objectContaining({ apiUrl: "https://nexus.invalid" }), "p")
+    expect(lookup.mock.calls).toEqual([
+      [expect.objectContaining({ apiUrl: "https://nexus.invalid" }), "p", "0.18.0"],
+      [expect.objectContaining({ apiUrl: "https://nexus.invalid" }), "p"],
+    ])
+  })
+
+  it("finds a release session older than the newest open sessions via the release_line filter", async () => {
+    gitHead(`ref: refs/heads/${BRANCH}\n`)
+    const newest = Array.from({ length: 25 }, (_, i) => ({ title: `other work ${i}` }))
+    const lookup = vi.fn(async (_c: unknown, _p: string, releaseLine?: string) =>
+      releaseLine === "0.18.0" ? [{ title: `${BRANCH}: adapters` }] : newest,
+    )
+    expect(await checkReleaseLine(root, env, lookup, config)).toEqual({ action: "in_line" })
+    expect(lookup).toHaveBeenCalledTimes(1)
   })
 
   it("returns null when disabled and stays silent without credentials", async () => {
@@ -145,6 +158,17 @@ describe("fetchOpenSessions", () => {
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe("https://nexus.invalid/api/mcp/sessions")
     expect(JSON.parse(init.body)).toEqual({ action: "session_list", project_id: "p" })
+  })
+
+  it("passes release_line when given", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ sessions: [] })))
+    vi.stubGlobal("fetch", fetchMock)
+    expect(await fetchOpenSessions(config, "p", "0.18.0")).toEqual([])
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      action: "session_list",
+      project_id: "p",
+      release_line: "0.18.0",
+    })
   })
 
   it("returns null on HTTP errors, bad payloads and network failures", async () => {

@@ -47,8 +47,9 @@ Projects that keep one Nexus session per release line title it
 `staging/release-X.Y.Z: <focus>`. At session start the guard reads the
 current branch of the project root (`.git/HEAD`, no subprocess). Only on a
 `staging/release-X.Y.Z` branch it fetches the project's open Nexus sessions
-(`session_list` via the Nexus REST API, 3 s timeout) and, when no open
-session title starts with the branch name, injects one line asking the
+of that release line (`session_list` with `release_line: "X.Y.Z"` via the
+Nexus REST API, 3 s timeout) and, when no open session title starts with the
+branch name, fetches the newest open session for the message and injects one line asking the
 agent to close the old session with a summary (`/nexus-session-close`) and
 start `staging/release-X.Y.Z: <focus>` (`/nexus-init`). The guard never
 closes or creates sessions itself. Not a git checkout, detached HEAD, other

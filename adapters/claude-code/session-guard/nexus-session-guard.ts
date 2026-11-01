@@ -157,7 +157,7 @@ export async function handleSessionStart(
   directory: string,
   fileLog: (level: string, message: string) => void,
   env: NodeJS.ProcessEnv = process.env,
-  lookup?: (config: NexusConfig, projectId: string) => Promise<OpenSession[] | null>,
+  lookup?: (config: NexusConfig, projectId: string, releaseLine?: string) => Promise<OpenSession[] | null>,
 ): Promise<Record<string, unknown> | null> {
   const result = await checkReleaseLine(directory, env, lookup)
   if (!result) {

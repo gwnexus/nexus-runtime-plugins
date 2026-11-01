@@ -75,10 +75,11 @@ function resolveNexusConfig(directory, env = process.env) {
   const fromEnv = { apiUrl: nonEmpty(env.NEXUS_API_URL), token: nonEmpty(env.NEXUS_PRIVATE_TOKEN) };
   if (fromEnv.apiUrl && fromEnv.token) return { apiUrl: fromEnv.apiUrl, token: fromEnv.token, source: "env" };
   const project = readTomlPair(join3(directory, ".nexus"));
-  const pinnedUrl = project.apiUrl ? normalizeUrl(project.apiUrl) : null;
-  if (project.apiUrl && project.token) return { apiUrl: project.apiUrl, token: project.token, source: "project" };
+  const pinned = fromEnv.apiUrl ?? project.apiUrl;
+  const pinnedUrl = pinned ? normalizeUrl(pinned) : null;
   const home = env.HOME ?? env.USERPROFILE ?? "";
   const later = [
+    ["project", () => project],
     ["env", () => fromEnv],
     ["mcp", () => readJsonEnv(join3(directory, ".mcp.json"), (j) => j?.mcpServers?.nexus?.env)],
     ["opencode", () => readJsonEnv(join3(directory, "opencode.json"), (j) => j?.mcp?.nexus?.environment)],
@@ -88,7 +89,7 @@ function resolveNexusConfig(directory, env = process.env) {
     const c = read();
     if (!c.token) continue;
     if (!c.apiUrl) {
-      if (project.apiUrl) return { apiUrl: project.apiUrl, token: c.token, source };
+      if (pinned) return { apiUrl: pinned, token: c.token, source };
       continue;
     }
     if (pinnedUrl && normalizeUrl(c.apiUrl) !== pinnedUrl) continue;
@@ -387,7 +388,7 @@ function isEntrypoint(moduleUrl, argv1 = process.argv[1]) {
 }
 
 // adapters/claude-code/cost-control/nexus-cost-control.ts
-var PLUGIN_META = { name: "nexus-cost-control", version: "1.2.3" };
+var PLUGIN_META = { name: "nexus-cost-control", version: "1.2.4" };
 var STATE_FILE = "cost-control-state.json";
 function initialState() {
   return { lastAppendAt: null, lastAppendedTokens: null };

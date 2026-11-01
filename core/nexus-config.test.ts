@@ -41,9 +41,37 @@ describe("resolveNexusConfig", () => {
     ).toEqual({ apiUrl: "https://env.example", token: "env-token", source: "env" })
   })
 
-  it("ignores a partial env and falls through", () => {
+  it("falls through a URL-only env to a later source on the same API", () => {
+    globalToml("https://env.example/", "global-token")
+    expect(resolveNexusConfig(project, { ...env(), NEXUS_API_URL: "https://env.example" })).toEqual({
+      apiUrl: "https://env.example/",
+      token: "global-token",
+      source: "global",
+    })
+  })
+
+  it("pins a URL-only env: pairs a project token with the env host", () => {
+    projectToml(null, "file-token")
+    mcpJson("https://prod.example", "prod-token")
+    expect(resolveNexusConfig(project, { ...env(), NEXUS_API_URL: "https://staging.example" })).toEqual({
+      apiUrl: "https://staging.example",
+      token: "file-token",
+      source: "project",
+    })
+  })
+
+  it("pins a URL-only env: skips pairs that point at another API", () => {
+    projectToml("https://prod.example", "project-token")
+    mcpJson("https://prod.example", "mcp-token")
     globalToml("https://prod.example", "prod-token")
-    expect(resolveNexusConfig(project, { ...env(), NEXUS_API_URL: "https://env.example" })?.source).toBe("global")
+    const pinnedEnv = { ...env(), NEXUS_API_URL: "https://staging.example" }
+    expect(resolveNexusConfig(project, pinnedEnv)).toBeNull()
+    mcpJson("https://STAGING.example/", "mcp-token")
+    expect(resolveNexusConfig(project, pinnedEnv)).toEqual({
+      apiUrl: "https://STAGING.example/",
+      token: "mcp-token",
+      source: "mcp",
+    })
   })
 
   it("prefers project-local over .mcp.json and global", () => {

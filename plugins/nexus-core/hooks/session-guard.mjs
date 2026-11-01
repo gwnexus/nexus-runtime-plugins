@@ -64,7 +64,7 @@ function saveState(directory, fileName, state) {
 // core/session-guard/logic.ts
 var PLUGIN_META = {
   name: "nexus-session-guard",
-  version: "1.2.1",
+  version: "1.2.2",
   description: "Detects code-changing tool completions and reminds the agent to call nexus_session_append before proceeding."
 };
 var DEFAULT_TRIGGER_TOOLS = /* @__PURE__ */ new Set(["Edit", "Write", "MultiEdit"]);
@@ -151,10 +151,11 @@ function resolveNexusConfig(directory, env = process.env) {
   const fromEnv = { apiUrl: nonEmpty(env.NEXUS_API_URL), token: nonEmpty(env.NEXUS_PRIVATE_TOKEN) };
   if (fromEnv.apiUrl && fromEnv.token) return { apiUrl: fromEnv.apiUrl, token: fromEnv.token, source: "env" };
   const project = readTomlPair(join3(directory, ".nexus"));
-  const pinnedUrl = project.apiUrl ? normalizeUrl(project.apiUrl) : null;
-  if (project.apiUrl && project.token) return { apiUrl: project.apiUrl, token: project.token, source: "project" };
+  const pinned = fromEnv.apiUrl ?? project.apiUrl;
+  const pinnedUrl = pinned ? normalizeUrl(pinned) : null;
   const home = env.HOME ?? env.USERPROFILE ?? "";
   const later = [
+    ["project", () => project],
     ["env", () => fromEnv],
     ["mcp", () => readJsonEnv(join3(directory, ".mcp.json"), (j) => j?.mcpServers?.nexus?.env)],
     ["opencode", () => readJsonEnv(join3(directory, "opencode.json"), (j) => j?.mcp?.nexus?.environment)],
@@ -164,7 +165,7 @@ function resolveNexusConfig(directory, env = process.env) {
     const c = read();
     if (!c.token) continue;
     if (!c.apiUrl) {
-      if (project.apiUrl) return { apiUrl: project.apiUrl, token: c.token, source };
+      if (pinned) return { apiUrl: pinned, token: c.token, source };
       continue;
     }
     if (pinnedUrl && normalizeUrl(c.apiUrl) !== pinnedUrl) continue;
@@ -270,12 +271,14 @@ function formatReleaseNudge(branch, openTitle) {
 function truncate(s, max) {
   return s.length > max ? `${s.slice(0, max - 3)}...` : s;
 }
-async function fetchOpenSessions(config, projectId, timeoutMs = SESSION_LOOKUP_TIMEOUT_MS) {
+async function fetchOpenSessions(config, projectId, releaseLine, timeoutMs = SESSION_LOOKUP_TIMEOUT_MS) {
   try {
+    const body = { action: "session_list", project_id: projectId };
+    if (releaseLine) body.release_line = releaseLine;
     const res = await fetch(`${config.apiUrl}/api/mcp/sessions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.token}` },
-      body: JSON.stringify({ action: "session_list", project_id: projectId }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(timeoutMs)
     });
     if (!res.ok) return null;
@@ -289,11 +292,14 @@ async function fetchOpenSessions(config, projectId, timeoutMs = SESSION_LOOKUP_T
 async function checkReleaseLine(projectRoot, env = process.env, lookup = fetchOpenSessions, resolveConfig = getNexusConfig) {
   if (!isReleaseNudgeEnabled(env)) return null;
   const branch = readGitBranch(projectRoot);
-  if (!branch || !RELEASE_BRANCH_RE.test(branch)) return evaluateReleaseLine(branch, null);
+  const releaseLine = branch?.match(RELEASE_BRANCH_RE)?.[1];
+  if (!branch || !releaseLine) return evaluateReleaseLine(branch, null);
   const config = resolveConfig(projectRoot);
   const projectId = env.NEXUS_PROJECT_ID?.trim() || readProjectIdFromAgentsMd(projectRoot);
-  const sessions = config && projectId ? await lookup(config, projectId) : null;
-  return evaluateReleaseLine(branch, sessions);
+  if (!config || !projectId) return evaluateReleaseLine(branch, null);
+  const inLine = await lookup(config, projectId, releaseLine);
+  if (inLine?.some((s) => titleMatchesBranch(s.title, branch))) return { action: "in_line" };
+  return evaluateReleaseLine(branch, await lookup(config, projectId));
 }
 
 // core/project-root.ts

@@ -13,12 +13,15 @@ import { join } from "node:path"
  *   5. global   ~/.config/nexus/config.toml + credentials.toml
  *
  * A source counts only when it yields both URL and token; a URL from one
- * source is never combined with a token configured for another API. When the
- * project-local config pins an `api_url`, later sources are accepted only if
- * they point at that same API, so a project linked to e.g. staging never falls
- * through to production credentials. The one exception: a later source that
- * carries a token but no URL (e.g. NEXUS_PRIVATE_TOKEN without NEXUS_API_URL)
- * is paired with the pinned URL. Without a pinned URL it is skipped.
+ * source is never combined with a token configured for another API. An
+ * `api_url` pins the API: `NEXUS_API_URL` from the environment (even without a
+ * token), otherwise the project-local `api_url`. Later sources, the project
+ * pair included, are then accepted only if they point at that same API, so a
+ * developer who selected e.g. staging never falls through to production
+ * credentials. The one exception: a later source that carries a token but no
+ * URL (e.g. a project `credentials.toml` without `api_url`, or
+ * NEXUS_PRIVATE_TOKEN without NEXUS_API_URL) is paired with the pinned URL.
+ * Without a pinned URL it is skipped.
  * Hooks run outside `nexus run`, so the env source is usually absent.
  */
 
@@ -43,11 +46,12 @@ export function resolveNexusConfig(
   if (fromEnv.apiUrl && fromEnv.token) return { apiUrl: fromEnv.apiUrl, token: fromEnv.token, source: "env" }
 
   const project = readTomlPair(join(directory, ".nexus"))
-  const pinnedUrl = project.apiUrl ? normalizeUrl(project.apiUrl) : null
-  if (project.apiUrl && project.token) return { apiUrl: project.apiUrl, token: project.token, source: "project" }
+  const pinned = fromEnv.apiUrl ?? project.apiUrl
+  const pinnedUrl = pinned ? normalizeUrl(pinned) : null
 
   const home = env.HOME ?? env.USERPROFILE ?? ""
   const later: Array<[NexusConfigSource, () => Candidate]> = [
+    ["project", () => project],
     ["env", () => fromEnv],
     ["mcp", () => readJsonEnv(join(directory, ".mcp.json"), (j) => j?.mcpServers?.nexus?.env)],
     ["opencode", () => readJsonEnv(join(directory, "opencode.json"), (j) => j?.mcp?.nexus?.environment)],
@@ -57,8 +61,8 @@ export function resolveNexusConfig(
     const c = read()
     if (!c.token) continue
     if (!c.apiUrl) {
-      // Token-only source: usable only with the project's pinned API.
-      if (project.apiUrl) return { apiUrl: project.apiUrl, token: c.token, source }
+      // Token-only source: usable only with the pinned API.
+      if (pinned) return { apiUrl: pinned, token: c.token, source }
       continue
     }
     if (pinnedUrl && normalizeUrl(c.apiUrl) !== pinnedUrl) continue

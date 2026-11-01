@@ -92,18 +92,23 @@ function truncate(s: string, max: number): string {
 
 /**
  * Open sessions of `projectId` via the Nexus REST API (`session_list`, which
- * returns open sessions only). Returns null on any failure or timeout.
+ * returns open sessions only, newest first and capped). With `releaseLine`
+ * the backend returns only sessions of that release line, so an older one is
+ * not cut off by the cap. Returns null on any failure or timeout.
  */
 export async function fetchOpenSessions(
   config: NexusConfig,
   projectId: string,
+  releaseLine?: string,
   timeoutMs: number = SESSION_LOOKUP_TIMEOUT_MS,
 ): Promise<OpenSession[] | null> {
   try {
+    const body: Record<string, string> = { action: "session_list", project_id: projectId }
+    if (releaseLine) body.release_line = releaseLine
     const res = await fetch(`${config.apiUrl}/api/mcp/sessions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.token}` },
-      body: JSON.stringify({ action: "session_list", project_id: projectId }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(timeoutMs),
     })
     if (!res.ok) return null
@@ -119,19 +124,25 @@ export async function fetchOpenSessions(
 
 /**
  * End to end for one session start: enabled check, branch, then (only on a
- * release branch) credentials, project id and the session lookup. Never throws.
+ * release branch) credentials, project id and the session lookup. The first
+ * lookup is filtered by the branch's release line; only when it finds no
+ * matching session does a second, unfiltered lookup supply the newest open
+ * session for the nudge text. Never throws.
  */
 export async function checkReleaseLine(
   projectRoot: string,
   env: NodeJS.ProcessEnv = process.env,
-  lookup: (config: NexusConfig, projectId: string) => Promise<OpenSession[] | null> = fetchOpenSessions,
+  lookup: (config: NexusConfig, projectId: string, releaseLine?: string) => Promise<OpenSession[] | null> = fetchOpenSessions,
   resolveConfig: (projectRoot: string) => NexusConfig | null = getNexusConfig,
 ): Promise<ReleaseLineResult | null> {
   if (!isReleaseNudgeEnabled(env)) return null
   const branch = readGitBranch(projectRoot)
-  if (!branch || !RELEASE_BRANCH_RE.test(branch)) return evaluateReleaseLine(branch, null)
+  const releaseLine = branch?.match(RELEASE_BRANCH_RE)?.[1]
+  if (!branch || !releaseLine) return evaluateReleaseLine(branch, null)
   const config = resolveConfig(projectRoot)
   const projectId = env.NEXUS_PROJECT_ID?.trim() || readProjectIdFromAgentsMd(projectRoot)
-  const sessions = config && projectId ? await lookup(config, projectId) : null
-  return evaluateReleaseLine(branch, sessions)
+  if (!config || !projectId) return evaluateReleaseLine(branch, null)
+  const inLine = await lookup(config, projectId, releaseLine)
+  if (inLine?.some((s) => titleMatchesBranch(s.title, branch))) return { action: "in_line" }
+  return evaluateReleaseLine(branch, await lookup(config, projectId))
 }
