@@ -104,8 +104,18 @@ check_ai_tools() {
 check_dev_tools() {
   # GitHub CLI
   if dbx_has gh; then
-    if gh auth status &>/dev/null; then
-      _record "gh" ok "authenticated"
+    local gh_login gh_via="global login"
+    [[ -n "${GH_CONFIG_DIR:-}" && -f "${DBX_REPO_ROOT}/.nexus/gh.env" ]] && gh_via="project profile"
+    # Active account from the account list (no API call); "as <login>" is
+    # the format of gh releases before multi-account support.
+    gh_login="$(gh auth status --hostname "${GH_HOST:-github.com}" 2>&1 | awk '
+      /Logged in to/ { for (i = 1; i < NF; i++) if ($i == "account" || $i == "as") acct = $(i + 1); if (!first) first = acct }
+      /Active account: true/ { print acct; found = 1; exit }
+      END { if (!found && first) print first }')"
+    if [[ -n "${gh_login}" ]]; then
+      _record "gh" ok "${gh_login} (${gh_via})"
+    elif [[ "${gh_via}" == "project profile" ]]; then
+      _record "gh" warn "project profile not logged in: nexus git login"
     else
       _record "gh" warn "unauthenticated"
     fi
