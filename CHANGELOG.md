@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`nexus-routing-guard` v1.1.0 + `nexus-core` v1.4.0: actor lanes; actors matched by profile slug.**
+  - **Route matching.** The Claude Code adapter matched an actor's `model_profile_id` (a UUID) against `route_alias`, so it never found a route and checked nothing. Actors are now matched by `profile_slug`, then `route_alias`; `model_profile_id` is only a lookup key for files from older hubs that carry neither.
+  - **Lane checks (Claude Code).** When the hub ships resolved actors (`lane`, `session_model`, `status` in `agent-routing.json`), the session-start check also reads the subagents in `.claude/agents/*.md` and warns, without blocking, about a session-lane subagent whose model is not `inherit`, `sonnet`, `opus`, `haiku` or `claude-*` (`session_model_not_allowed`), a gateway-lane actor defined as a session subagent (`gateway_actor_in_session`) and an actor the hub could not resolve (`unresolved_actor_model`). The actors per lane are logged on every run. Without lane data the check runs as before.
+  - **OpenCode.** Behaviour unchanged; the adapter reads the live runtime catalog and does not use the actor transform. Its tests pass unchanged.
+  - New tests: `core/routing-guard/lanes.test.ts` (session-model allowlist, subagent frontmatter, all three lane warnings, older hubs skipped, lane summary), profile-slug matching in `core/routing-guard/nexus-cli-catalog.test.ts`, and three lane cases in the Claude Code adapter tests. `nexus-core` bundles rebuilt.
+
 ### Fixed
 - **`nexus-core` v1.3.3 -- an env-only `NEXUS_API_URL` did not pin the API; the release-line check could miss older release sessions.**
   - **Env URL pinning.** `resolveNexusConfig()` used the environment only when both `NEXUS_API_URL` and `NEXUS_PRIVATE_TOKEN` were set. With only `NEXUS_API_URL` set (for example pointing at staging) and the token in a file, the resolver returned the first complete pair from `.mcp.json`, `opencode.json` or the global config, possibly for another host, and compaction and cost entries were sent there. `NEXUS_API_URL` from the environment now pins the API ahead of the project-local `api_url`: every later pair, the project pair included, is used only if it points at the same API, and a token-only source (for example a project `credentials.toml` without `api_url`) is paired with the pinned URL.

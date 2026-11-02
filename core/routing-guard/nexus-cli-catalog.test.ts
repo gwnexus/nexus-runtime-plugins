@@ -36,6 +36,20 @@ describe("routing-guard nexus-cli catalog transform", () => {
     expect(agents[0].model).toBeUndefined()
   })
 
+  it("matches actors by profile_slug, then route_alias; a model_profile_id UUID alongside is ignored", () => {
+    const agentFile = {
+      actors: [
+        { slug: "a", profile_slug: "nexus-act", model_profile_id: "8d0f2c1e-1111-4222-8333-444455556666" },
+        { slug: "b", route_alias: "nexus-plan", model_profile_id: "8d0f2c1e-1111-4222-8333-444455556666" },
+        { slug: "c", model_profile_id: "8d0f2c1e-1111-4222-8333-444455556666" },
+      ],
+    }
+    const agents = buildAgentInfoFromActors(agentFile, catalogFile)
+    expect(agents[0].model).toEqual({ providerID: "opencode", modelID: "big-pickle" })
+    expect(agents[1].model).toEqual({ providerID: "github-copilot", modelID: "claude-sonnet-5" })
+    expect(agents[2].model).toBeUndefined()
+  })
+
   it("end-to-end: transformed real-shape files feed detectRoutingWarnings correctly", () => {
     const divergentAgentFile = {
       actors: [{ slug: "nexus-plan", model_profile_id: "nexus-plan" }],

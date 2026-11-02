@@ -5,11 +5,12 @@ vi.mock("node:fs", async () => {
   return {
     ...actual,
     existsSync: vi.fn(),
+    readdirSync: vi.fn(),
     readFileSync: vi.fn(),
   }
 })
 
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { handleSessionStart } from "./nexus-routing-guard.ts"
 
 describe("routing-guard Claude Code adapter", () => {
@@ -124,6 +125,56 @@ describe("routing-guard Claude Code adapter", () => {
       // in core/routing-guard/nexus-cli-catalog.test.ts.
       const result = handleSessionStart({ cwd: "/tmp/proj" }, logger)
       expect(result).toBeNull()
+    })
+  })
+
+  describe("lane checks (hub-resolved actors)", () => {
+    const catalog = {
+      model_routes: [
+        { route_alias: "anthropic-premium-reasoning", provider: "anthropic", model: "claude-opus-4-8" },
+        { route_alias: "local-coder-main", provider: "dgx-spark", model: "nexus-coder-main" },
+        { route_alias: "local-review", provider: "dgx-spark", model: "nexus-coder-main" },
+      ],
+    }
+    const actors = [
+      { slug: "architect", profile_slug: "anthropic-premium-reasoning", lane: "session", session_model: "opus", status: "resolved" },
+      { slug: "spark-coder", profile_slug: "local-coder-main", lane: "gateway", status: "resolved" },
+      { slug: "spark-review", profile_slug: "local-review", lane: "gateway", status: "resolved" },
+    ]
+
+    function mockProject(subagentFiles: Record<string, string>) {
+      vi.mocked(existsSync).mockReturnValue(true)
+      vi.mocked(readdirSync).mockReturnValue(Object.keys(subagentFiles) as any)
+      vi.mocked(readFileSync).mockImplementation((path: any) => {
+        const p = String(path)
+        if (p.includes("routing-catalog")) return JSON.stringify(catalog)
+        if (p.includes("agent-routing")) return JSON.stringify({ actors })
+        const name = Object.keys(subagentFiles).find((f) => p.endsWith(`/.claude/agents/${f}`))
+        if (name) return subagentFiles[name]
+        throw new Error(`unexpected read ${p}`)
+      })
+    }
+
+    it("logs the lanes and stays silent for a clean session-lane setup", () => {
+      mockProject({ "architect.md": "---\nname: architect\ndescription: d\nmodel: opus\n---\n" })
+      expect(handleSessionStart({ cwd: "/tmp/proj" }, logger)).toBeNull()
+      expect(logs).toContainEqual(["info", "Actor lanes: session=[architect] gateway=[spark-coder, spark-review]"])
+    })
+
+    it("does not count hub actor markdown without name/description as a subagent", () => {
+      mockProject({ "spark-coder.md": "---\nid: 1\nslug: spark-coder\n---\n" })
+      expect(handleSessionStart({ cwd: "/tmp/proj" }, logger)).toBeNull()
+    })
+
+    it("warns about a gateway-lane subagent and a disallowed session model", () => {
+      mockProject({
+        "architect.md": "---\nname: architect\ndescription: d\nmodel: nexus-coder-main\n---\n",
+        "spark-review.md": "---\nname: spark-review\ndescription: d\nmodel: inherit\n---\n",
+      })
+      const ctx = (handleSessionStart({ cwd: "/tmp/proj" }, logger) as any).hookSpecificOutput.additionalContext
+      expect(ctx).toContain("[session_model_not_allowed]")
+      expect(ctx).toContain("[gateway_actor_in_session]")
+      expect(ctx).toContain("Lane warnings:")
     })
   })
 })

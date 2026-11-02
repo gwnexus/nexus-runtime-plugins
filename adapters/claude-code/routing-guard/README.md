@@ -28,7 +28,7 @@ files relative to the project's agentic root:
 
 ```
 .nexus/generated/routing-catalog.json   -> { "model_routes": [{ route_alias, provider, model, lifecycle_status }, ...] }
-.nexus/generated/agent-routing.json     -> { "actors": [{ slug, title, model_profile_id, is_primary, priority, ... }, ...] }
+.nexus/generated/agent-routing.json     -> { "actors": [{ slug, title, model_profile_id, profile_slug, route_alias, lane, session_model, status, ... }, ...] }
 ```
 
 These are read by default and converted into the plugin's internal
@@ -39,10 +39,28 @@ are only needed to override the default file location (e.g. for manual
 testing with hand-written catalog/agent JSON in the plugin's own internal
 shape, which is also still accepted as a fallback).
 
-**Assumption not yet explicitly confirmed by the Nexus CLI:** an actor's
-`model_profile_id` corresponds 1:1 to a model route's `route_alias`. If
-nexus-cli's actual linkage differs, `buildAgentInfoFromActors()` needs
-correction — flagged in that module's code comments.
+**Actor-to-route linkage:** an actor is matched to a model route by its
+`profile_slug`, then its `route_alias`. `model_profile_id` is a UUID and
+never equals a `route_alias`; it is only used as a lookup key when an older
+hub ships neither slug nor alias, so those files behave as before.
+
+**Lane checks.** Hubs that resolve actor models per lane add `lane`
+(`session` or `gateway`), `session_model` and a resolution `status` to each
+actor. The adapter then also reads the subagents Claude Code would load from
+`.claude/agents/*.md` (files whose frontmatter declares `name` and
+`description`) and warns, without blocking, about:
+
+- `session_model_not_allowed`: a session-lane subagent (or, without a
+  subagent file, the hub's `session_model`) names a model other than
+  `inherit`, `sonnet`, `opus`, `haiku` or `claude-*`.
+- `gateway_actor_in_session`: a gateway-lane actor is defined as a session
+  subagent and would run inside the subscription session instead of a
+  gateway-backed process.
+- `unresolved_actor_model`: the hub could not resolve the actor's model.
+
+The actors per lane are logged on every run (`Actor lanes: session=[...]
+gateway=[...]` in `.nexus/routing-guard.log`). Actors without a `lane` are
+not lane-checked.
 
 **Known caveat (confirmed Nexus CLI behavior, not a bug):** nexus-cli only injects
 env vars into `.claude/settings.json` on first-creation of that file.
@@ -110,13 +128,14 @@ the OpenCode adapter).
 npm test -- adapters/claude-code/routing-guard core/routing-guard
 ```
 
-7 unit tests for this adapter (env-var opt-out, missing-file fail-open
+10 unit tests for this adapter (env-var opt-out, missing-file fail-open
 behavior, clean-config no-op, divergence banner generation, malformed-JSON
-fail-open behavior, nexus-cli shape auto-detection with default paths, and
-no-matching-route handling), plus 4 unit tests for the
-`nexus-cli-catalog.ts` transform (provider grouping, `model_profile_id` ->
-`route_alias` resolution, end-to-end divergence detection through the
-transform).
+fail-open behavior, nexus-cli shape auto-detection with default paths,
+no-matching-route handling, and lane checks against `.claude/agents`), 5
+unit tests for the `nexus-cli-catalog.ts` transform (provider grouping,
+route resolution by `profile_slug` / `route_alias`, end-to-end divergence
+detection through the transform), and the lane rules in
+`core/routing-guard/lanes.test.ts`.
 
 ## License
 

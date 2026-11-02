@@ -27,9 +27,15 @@
  *
  * These are read by default (paths overridable via env vars below) and
  * converted to the plugin's internal `ProviderCatalog`/`AgentInfo[]` shape
- * via `core/routing-guard/nexus-cli-catalog.ts`. See that module for the
- * `model_profile_id` <-> `route_alias` linkage assumption, which has not
- * yet been explicitly confirmed by the Nexus CLI.
+ * via `core/routing-guard/nexus-cli-catalog.ts` (actors are matched to routes
+ * by `profile_slug`, then `route_alias`).
+ *
+ * LANE CHECKS: when the hub resolves actors per lane (`lane`,
+ * `session_model`, `status` in agent-routing.json), the adapter also reads
+ * the Claude Code subagents in `.claude/agents/*.md` and warns about a
+ * session-lane subagent with a model outside the session allowlist, a
+ * gateway-lane actor defined as a session subagent, and unresolved actors
+ * (`core/routing-guard/lanes.ts`). Warnings only; nothing is blocked.
  *
  * KNOWN CAVEAT (confirmed Nexus CLI behavior, not a bug): nexus-cli only injects
  * the env vars below into `.claude/settings.json` on first-creation of that
@@ -53,7 +59,7 @@
  *     }
  *   }
  */
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { createFileLogger } from "../../../core/logger.ts"
 import { detectRoutingWarnings } from "../../../core/routing-guard/detect.ts"
@@ -62,12 +68,18 @@ import {
   buildProviderCatalogFromRoutes,
   buildAgentInfoFromActors,
 } from "../../../core/routing-guard/nexus-cli-catalog.ts"
-import type { RoutingCatalogFile, AgentRoutingFile } from "../../../core/routing-guard/nexus-cli-catalog.ts"
+import type { RoutingCatalogFile, AgentRoutingFile, ActorEntry } from "../../../core/routing-guard/nexus-cli-catalog.ts"
+import {
+  detectLaneWarnings,
+  parseSubagentFrontmatter,
+  summarizeLanes,
+  type ClaudeSubagent,
+} from "../../../core/routing-guard/lanes.ts"
 import type { AgentInfo, ProviderCatalog } from "../../../core/routing-guard/types.ts"
 import { resolveProjectRoot } from "../../../core/project-root.ts"
 import { isEntrypoint } from "../../../core/entrypoint.ts"
 
-const PLUGIN_META = { name: "nexus-routing-guard", version: "1.0.1" } as const
+const PLUGIN_META = { name: "nexus-routing-guard", version: "1.1.0" } as const
 const ENV_ENABLED = "NEXUS_ROUTING_GUARD_ENABLED"
 const ENV_CATALOG_PATH = "NEXUS_ROUTING_GUARD_CATALOG_PATH"
 const ENV_AGENTS_PATH = "NEXUS_ROUTING_GUARD_AGENTS_PATH"
@@ -99,7 +111,9 @@ function defaultAgentsPath(directory: string): string {
  *  - the plugin's own internal shape directly ({ providers: [...] } / AgentInfo[]),
  *    for advanced/manual overrides via the env vars.
  */
-function resolveCatalogAndAgents(directory: string): { catalog: ProviderCatalog; agents: AgentInfo[] } | null {
+function resolveCatalogAndAgents(
+  directory: string,
+): { catalog: ProviderCatalog; agents: AgentInfo[]; actors: ActorEntry[] } | null {
   const catalogRaw = readJsonFile<RoutingCatalogFile | ProviderCatalog>(defaultCatalogPath(directory))
   const agentsRaw = readJsonFile<AgentRoutingFile | AgentInfo[]>(defaultAgentsPath(directory))
   if (!catalogRaw || !agentsRaw) return null
@@ -113,11 +127,33 @@ function resolveCatalogAndAgents(directory: string): { catalog: ProviderCatalog;
     return {
       catalog: buildProviderCatalogFromRoutes(catalogRaw),
       agents: buildAgentInfoFromActors(agentsRaw, catalogRaw),
+      actors: agentsRaw.actors,
     }
   }
 
   // Fallback: assume the files are already in the plugin's internal shape.
-  return { catalog: catalogRaw as ProviderCatalog, agents: agentsRaw as AgentInfo[] }
+  return { catalog: catalogRaw as ProviderCatalog, agents: agentsRaw as AgentInfo[], actors: [] }
+}
+
+/** Subagents Claude Code would load from `<project>/.claude/agents/*.md`. */
+function readClaudeSubagents(directory: string): ClaudeSubagent[] {
+  const dir = join(directory, ".claude", "agents")
+  if (!existsSync(dir)) return []
+  const subagents: ClaudeSubagent[] = []
+  try {
+    for (const file of readdirSync(dir)) {
+      if (!file.endsWith(".md")) continue
+      try {
+        const parsed = parseSubagentFrontmatter(readFileSync(join(dir, file), "utf-8"))
+        if (parsed) subagents.push(parsed)
+      } catch {
+        // unreadable file: not loadable as a subagent either
+      }
+    }
+  } catch {
+    return []
+  }
+  return subagents
 }
 
 /** Testable handler for the `session-start` mode. */
@@ -142,10 +178,13 @@ export function handleSessionStart(
     return null
   }
 
-  const { catalog, agents } = resolved
+  const { catalog, agents, actors } = resolved
 
   try {
-    const warnings = detectRoutingWarnings(catalog, agents)
+    const lanes = summarizeLanes(actors)
+    if (lanes) logger("info", `Actor lanes: ${lanes}`)
+    const laneWarnings = lanes ? detectLaneWarnings(actors, readClaudeSubagents(directory)) : []
+    const warnings = [...detectRoutingWarnings(catalog, agents), ...laneWarnings]
 
     if (warnings.length === 0) {
       logger("debug", "No routing divergence detected")

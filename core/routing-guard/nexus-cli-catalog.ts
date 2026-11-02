@@ -13,10 +13,12 @@ import type { AgentInfo, ProviderCatalog } from "./types.ts"
  * functions convert the real files into that shape so the shared core
  * detection logic doesn't need to know about nexus-cli's file format.
  *
- * ASSUMPTION (not yet confirmed by the Nexus platform, flagged in the adapter
- * README): an actor's `model_profile_id` corresponds 1:1 to a model route's
- * `route_alias`. If nexus-cli's actual linkage differs, this mapping will
- * need correction.
+ * Actor-to-route linkage: newer hubs resolve each actor once and ship
+ * `profile_slug` (authoritative), `route_alias` (legacy fallback), `lane`,
+ * `session_model` and `status` per actor. The actor's route is looked up by
+ * `profile_slug`, then `route_alias`. `model_profile_id` is a UUID and never
+ * equals a `route_alias`; it is used as a lookup key only for files that
+ * carry neither slug nor alias, which keeps the behaviour for older hubs.
  */
 
 export interface ModelRoute {
@@ -38,6 +40,12 @@ export interface ActorEntry {
   is_primary?: boolean
   priority?: number
   model_profile_id?: string
+  /** Resolved by the hub (runtime_spec); absent on older hubs. */
+  profile_slug?: string
+  route_alias?: string
+  lane?: string
+  session_model?: string
+  status?: string
 }
 
 export interface AgentRoutingFile {
@@ -59,12 +67,18 @@ export function buildProviderCatalogFromRoutes(file: RoutingCatalogFile): Provid
   }
 }
 
+/** Key used to find an actor's route: profile slug, then route alias, then (older hubs) model_profile_id. */
+export function actorRouteKey(actor: ActorEntry): string | undefined {
+  return actor.profile_slug || actor.route_alias || actor.model_profile_id || undefined
+}
+
 /**
  * Build an AgentInfo[] from nexus-cli's agent-routing.json, resolving each
- * actor's `model_profile_id` against the routing catalog's `route_alias` to
- * recover the provider/model pair `detectRoutingWarnings()` needs.
+ * actor's route key (`actorRouteKey`) against the routing catalog's
+ * `route_alias` to recover the provider/model pair `detectRoutingWarnings()`
+ * needs.
  *
- * Actors with no `model_profile_id`, or whose id does not match any known
+ * Actors without a route key, or whose key does not match any known
  * route_alias, are returned without a `model` field -- matching
  * `detectRoutingWarnings()`'s existing behavior of never checking agents
  * that have no explicit model (inherits instance default, valid by
@@ -76,7 +90,8 @@ export function buildAgentInfoFromActors(agentFile: AgentRoutingFile, catalogFil
   )
 
   return (agentFile.actors ?? []).map((actor) => {
-    const route = actor.model_profile_id ? routeByAlias.get(actor.model_profile_id) : undefined
+    const key = actorRouteKey(actor)
+    const route = key ? routeByAlias.get(key) : undefined
     return {
       name: actor.slug,
       ...(route ? { model: { providerID: route.provider, modelID: route.model } } : {}),

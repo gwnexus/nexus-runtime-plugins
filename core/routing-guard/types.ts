@@ -3,7 +3,12 @@
  */
 
 export type RoutingWarning = {
-  code: "unknown_provider" | "unknown_model"
+  code:
+    | "unknown_provider"
+    | "unknown_model"
+    | "session_model_not_allowed"
+    | "gateway_actor_in_session"
+    | "unresolved_actor_model"
   agent: string
   provider: string
   model: string
