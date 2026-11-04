@@ -8,7 +8,7 @@ import { isAbsolute as isAbsolute2, join as join3, resolve as resolve3 } from "n
 // core/agent-observer/types.ts
 var PLUGIN_META = {
   name: "nexus-agent-observer",
-  version: "1.0.1",
+  version: "1.0.2",
   description: "Writes nexus.agent-observation.v1 events from Claude Code hooks for the Agent Observability pane."
 };
 var OBSERVATION_SCHEMA = "nexus.agent-observation.v1";
@@ -47,6 +47,16 @@ function notificationState(status) {
     default:
       return "unknown";
   }
+}
+var WAITING_NOTIFICATIONS = /* @__PURE__ */ new Set([
+  "permission_prompt",
+  "elicitation_dialog",
+  "elicitation_url_dialog",
+  "agent_needs_input"
+]);
+function notificationTypeState(type, message, current) {
+  if (type) return WAITING_NOTIFICATIONS.has(type) ? "waiting" : current;
+  return typeof message === "string" && /\bpermission\b/i.test(message) ? "waiting" : current;
 }
 function observe(input, state, ctx) {
   const event = typeof input.hook_event_name === "string" ? input.hook_event_name : null;
@@ -157,7 +167,7 @@ function observe(input, state, ctx) {
     }
     case "Notification": {
       subject = touchCaller();
-      recState = "waiting";
+      recState = notificationTypeState(str(input.notification_type), input.message, subject?.state ?? "unknown");
       break;
     }
     case "SubagentStart": {
@@ -267,7 +277,8 @@ function buildRecord(event, nowIso, ctx, input, sessionId, agentId, agent, recSt
     startedAt,
     runtimeMs,
     inputTokens: agent?.usage ? agent.usage.inputTokens : null,
-    outputTokens: agent?.usage ? agent.usage.outputTokens : null
+    outputTokens: agent?.usage ? agent.usage.outputTokens : null,
+    notification: event === "Notification" ? str(input.notification_type) : null
   };
 }
 function str(v) {

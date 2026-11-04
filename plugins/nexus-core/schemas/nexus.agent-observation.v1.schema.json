@@ -74,7 +74,7 @@
         "failed",
         "unknown"
       ],
-      "description": "working: UserPromptSubmit / PreToolUse / PostToolUse(Failure) of the agent itself, and SubagentStart; waiting: Notification; done: Stop, SubagentStop, SessionEnd, or a completed <task-notification>; failed: StopFailure, a failed/killed <task-notification>, or PostToolUseFailure of a background Bash launch; unknown otherwise (e.g. SessionStart)."
+      "description": "working: UserPromptSubmit / PreToolUse / PostToolUse(Failure) of the agent itself, and SubagentStart; waiting: a Notification that needs the user (permission_prompt, elicitation_dialog, elicitation_url_dialog, agent_needs_input; without notification_type, a permission message); other notifications such as idle_prompt keep the previous state; done: Stop, SubagentStop, SessionEnd, or a completed <task-notification>; failed: StopFailure, a failed/killed <task-notification>, or PostToolUseFailure of a background Bash launch; unknown otherwise (e.g. SessionStart)."
     },
     "task": {
       "type": [
@@ -155,6 +155,13 @@
       ],
       "minimum": 0,
       "description": "Cumulative output tokens for this agent; same source and cadence as inputTokens."
+    },
+    "notification": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "notification_type of a Notification event as sent by the runtime (e.g. permission_prompt, idle_prompt, auth_success); null for other events or when the runtime sends none. Optional: absent in records written before nexus-agent-observer 1.0.2."
     }
   }
 }

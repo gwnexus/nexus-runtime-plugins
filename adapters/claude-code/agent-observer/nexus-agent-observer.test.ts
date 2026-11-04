@@ -245,8 +245,43 @@ describe("agent-observer: mapping rules", () => {
       state,
       ctxAt(0),
     )!
-    expect(r).toMatchObject({ agentId: "s1", role: "main", state: "waiting" })
-    expect(JSON.stringify(r)).not.toContain("permission")
+    expect(r).toMatchObject({ agentId: "s1", role: "main", state: "waiting", notification: "permission_prompt" })
+    expect(JSON.stringify(r)).not.toContain("needs your permission")
+  })
+
+  it("Notification maps by notification_type: only user-action types mean waiting", () => {
+    const after = (stateBefore: "done" | "working", extra: Record<string, unknown>) => {
+      const state = initialObserverState()
+      observe({ ...base, hook_event_name: stateBefore === "done" ? "Stop" : "UserPromptSubmit" }, state, ctxAt(0))
+      return observe({ ...base, hook_event_name: "Notification", message: "x", ...extra }, state, ctxAt(60_000))!
+    }
+    for (const t of ["permission_prompt", "elicitation_dialog", "elicitation_url_dialog", "agent_needs_input"]) {
+      expect(after("done", { notification_type: t }).state).toBe("waiting")
+    }
+    for (const t of ["idle_prompt", "auth_success", "agent_completed", "quota_auto_resume_fired", "plugin_notification"]) {
+      const r = after("done", { notification_type: t })
+      expect(r.state).toBe("done")
+      expect(r.notification).toBe(t)
+    }
+    expect(after("working", { notification_type: "idle_prompt" }).state).toBe("working")
+  })
+
+  it("idle_prompt after Stop keeps the main agent done until the next prompt", () => {
+    const state = initialObserverState()
+    observe({ ...base, hook_event_name: "Stop" }, state, ctxAt(0))
+    observe({ ...base, hook_event_name: "Notification", notification_type: "idle_prompt" }, state, ctxAt(65_000))
+    expect(state.agents.s1.state).toBe("done")
+    observe({ ...base, hook_event_name: "UserPromptSubmit", prompt: "next" }, state, ctxAt(90_000))
+    expect(state.agents.s1.state).toBe("working")
+  })
+
+  it("Notification without notification_type: waiting only for a permission message", () => {
+    const state = initialObserverState()
+    observe({ ...base, hook_event_name: "Stop" }, state, ctxAt(0))
+    const idle = observe({ ...base, hook_event_name: "Notification", message: "Claude is waiting for your input" }, state, ctxAt(1))!
+    expect(idle).toMatchObject({ state: "done", notification: null })
+    const perm = observe({ ...base, hook_event_name: "Notification", message: "Claude needs your permission to use Bash" }, state, ctxAt(2))!
+    expect(perm.state).toBe("waiting")
   })
 
   it("StopFailure -> failed", () => {

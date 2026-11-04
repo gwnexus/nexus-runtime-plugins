@@ -27,6 +27,14 @@ within the CCX compatibility range (`>=2.1.257 <3.0.0`). All payload shapes
 the mapping relies on were captured live from Claude Code 2.1.283 and are
 committed as redacted fixtures in `fixtures/`.
 
+`Notification` maps by `notification_type`: `permission_prompt`,
+`elicitation_dialog`, `elicitation_url_dialog` and `agent_needs_input` set
+`waiting` (the user has to act). Every other type keeps the agent's current
+state; in particular `idle_prompt`, which arrives about 60 s after a finished
+turn, leaves the main agent `done`. Without `notification_type` (older
+runtimes) only a message about a permission request sets `waiting`. The type
+is recorded in the `notification` field.
+
 ## How agents are derived
 
 | Agent | `agentId` | Started by | Finished by |

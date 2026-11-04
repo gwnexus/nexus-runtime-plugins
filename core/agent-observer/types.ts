@@ -8,7 +8,7 @@
 
 export const PLUGIN_META = {
   name: "nexus-agent-observer",
-  version: "1.0.1",
+  version: "1.0.2",
   description: "Writes nexus.agent-observation.v1 events from Claude Code hooks for the Agent Observability pane.",
 } as const
 
@@ -40,6 +40,8 @@ export interface AgentObservation {
   runtimeMs: number | null
   inputTokens: number | null
   outputTokens: number | null
+  /** `notification_type` of a Notification event (e.g. permission_prompt, idle_prompt); null otherwise. */
+  notification: string | null
 }
 
 /**
@@ -66,6 +68,8 @@ export interface ObserverHookInput {
   is_interrupt?: boolean
   agent_transcript_path?: string
   model?: unknown
+  notification_type?: string
+  message?: string
   [key: string]: unknown
 }
 

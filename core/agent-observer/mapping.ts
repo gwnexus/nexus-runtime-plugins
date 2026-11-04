@@ -88,6 +88,27 @@ export function notificationState(status: string | null): AgentState {
   }
 }
 
+/** Notification types that need the user to act; every other type leaves the state unchanged. */
+const WAITING_NOTIFICATIONS = new Set([
+  "permission_prompt",
+  "elicitation_dialog",
+  "elicitation_url_dialog",
+  "agent_needs_input",
+])
+
+/**
+ * State after a `Notification` hook. Only notifications that wait for the
+ * user (permission prompt, elicitation, agent input) mean `waiting`.
+ * `idle_prompt` (sent about 60 s after a finished turn) and informational
+ * types (auth, quota, plugin, agent completed) keep the current state, so a
+ * finished turn stays `done`. Without `notification_type` (older runtimes)
+ * only a message about a permission request means `waiting`.
+ */
+export function notificationTypeState(type: string | null, message: unknown, current: AgentState): AgentState {
+  if (type) return WAITING_NOTIFICATIONS.has(type) ? "waiting" : current
+  return typeof message === "string" && /\bpermission\b/i.test(message) ? "waiting" : current
+}
+
 export function observe(input: ObserverHookInput, state: ObserverState, ctx: ObserveContext): AgentObservation | null {
   const event = typeof input.hook_event_name === "string" ? input.hook_event_name : null
   if (!event) return null
@@ -208,7 +229,7 @@ export function observe(input: ObserverHookInput, state: ObserverState, ctx: Obs
 
     case "Notification": {
       subject = touchCaller()
-      recState = "waiting"
+      recState = notificationTypeState(str(input.notification_type), input.message, subject?.state ?? "unknown")
       break
     }
 
@@ -349,6 +370,7 @@ function buildRecord(
     runtimeMs,
     inputTokens: agent?.usage ? agent.usage.inputTokens : null,
     outputTokens: agent?.usage ? agent.usage.outputTokens : null,
+    notification: event === "Notification" ? str(input.notification_type) : null,
   }
 }
 
