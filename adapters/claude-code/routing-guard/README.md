@@ -28,7 +28,7 @@ files relative to the project's agentic root:
 
 ```
 .nexus/generated/routing-catalog.json   -> { "model_routes": [{ route_alias, provider, model, lifecycle_status }, ...] }
-.nexus/generated/agent-routing.json     -> { "actors": [{ slug, title, model_profile_id, profile_slug, route_alias, lane, session_model, status, ... }, ...] }
+.nexus/generated/agent-routing.json     -> { "actors": [{ slug, title, model_profile_id, profile_slug, route_alias, lane, lane_source, session_model, model_status, ... }, ...] }
 ```
 
 These are read by default and converted into the plugin's internal
@@ -45,8 +45,8 @@ never equals a `route_alias`; it is only used as a lookup key when an older
 hub ships neither slug nor alias, so those files behave as before.
 
 **Lane checks.** Hubs that resolve actor models per lane add `lane`
-(`session` or `gateway`), `session_model` and a resolution `status` to each
-actor. The adapter then also reads the subagents Claude Code would load from
+(`session` or `gateway`), `lane_source`, `session_model` and `model_status`
+(`resolved`, `unresolved_alias` or `unbound`) to each actor. The adapter then also reads the subagents Claude Code would load from
 `.claude/agents/*.md` (files whose frontmatter declares `name` and
 `description`) and warns, without blocking, about:
 
@@ -55,12 +55,20 @@ actor. The adapter then also reads the subagents Claude Code would load from
   `inherit`, `sonnet`, `opus`, `haiku` or `claude-*`.
 - `gateway_actor_in_session`: a gateway-lane actor is defined as a session
   subagent and would run inside the subscription session instead of a
-  gateway-backed process.
-- `unresolved_actor_model`: the hub could not resolve the actor's model.
+  gateway-backed process. A thin delegate is not flagged: a subagent that
+  calls `nexus actors run <slug>` for that actor, or a `haiku` subagent whose
+  only tool is `Bash`.
+- `unresolved_actor_model`: `model_status` is `unresolved_alias` (any lane),
+  or `unbound` on the gateway lane. An `unbound` session-lane actor is fine;
+  it carries its Claude model in `session_model`.
 
 The actors per lane are logged on every run (`Actor lanes: session=[...]
 gateway=[...]` in `.nexus/routing-guard.log`). Actors without a `lane` are
 not lane-checked.
+
+Relative paths in the `NEXUS_ROUTING_GUARD_CATALOG_PATH` /
+`NEXUS_ROUTING_GUARD_AGENTS_PATH` overrides (as nexus-cli writes them) are
+resolved against the project root, not the session's working directory.
 
 **Known caveat (confirmed Nexus CLI behavior, not a bug):** nexus-cli only injects
 env vars into `.claude/settings.json` on first-creation of that file.

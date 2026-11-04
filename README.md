@@ -31,7 +31,7 @@ auto-discovery mechanism (`.opencode/plugins/`). Migrated plugins (see
 | [**Cost Control**](./adapters/opencode/cost-control/README.md) | `v1.2.4` | Token usage and cost tracking via native runtime aggregation, with optional Helicone enrichment (OpenCode + Claude Code adapters) |
 | [**Headroom Intercept**](./adapters/opencode/headroom-intercept/README.md) | `v0.5.21` | Pre-injection context compression for Nexus MCP tool outputs (OpenCode + Claude Code adapters) |
 | [**Session Guard**](./adapters/opencode/session-guard/README.md) | `v1.2.2` | Enforces session append discipline after code-changing tool calls (OpenCode + Claude Code adapters) |
-| [**Routing Guard**](./adapters/opencode/routing-guard/README.md) | `v1.1.0` | Detects model routing divergence between Nexus config and the effective provider catalog (OpenCode + Claude Code adapters) |
+| [**Routing Guard**](./adapters/opencode/routing-guard/README.md) | `v1.1.1` | Detects model routing divergence between Nexus config and the effective provider catalog (OpenCode + Claude Code adapters) |
 | [**Attribution Headers**](./600-attribution-headers/README.md) | `v1.0.0` | Injects session/actor attribution headers on outgoing requests to the Nexus gateway provider |
 
 ## Claude Code plugin marketplace
@@ -193,7 +193,7 @@ before proceeding.
 
 ## Routing Guard
 
-**`v1.1.0` · [`adapters/opencode/routing-guard`](./adapters/opencode/routing-guard) (OpenCode) · [`adapters/claude-code/routing-guard`](./adapters/claude-code/routing-guard) (Claude Code)**
+**`v1.1.1` · [`adapters/opencode/routing-guard`](./adapters/opencode/routing-guard) (OpenCode) · [`adapters/claude-code/routing-guard`](./adapters/claude-code/routing-guard) (Claude Code)**
 
 > Migrated to the `core/` + `adapters/` structure. The pure
 > divergence-detection function lives in

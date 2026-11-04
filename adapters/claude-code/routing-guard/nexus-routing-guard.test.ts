@@ -128,6 +128,15 @@ describe("routing-guard Claude Code adapter", () => {
     })
   })
 
+  it("resolves relative env paths against the project root, not the process cwd", () => {
+    process.env.NEXUS_ROUTING_GUARD_CATALOG_PATH = ".nexus/generated/routing-catalog.json"
+    process.env.NEXUS_ROUTING_GUARD_AGENTS_PATH = ".nexus/generated/agent-routing.json"
+    const seen: string[] = []
+    vi.mocked(existsSync).mockImplementation((p: any) => (seen.push(String(p)), false))
+    handleSessionStart({ cwd: "/tmp/proj" }, logger)
+    expect(seen).toContain("/tmp/proj/.nexus/generated/routing-catalog.json")
+  })
+
   describe("lane checks (hub-resolved actors)", () => {
     const catalog = {
       model_routes: [
@@ -163,6 +172,15 @@ describe("routing-guard Claude Code adapter", () => {
 
     it("does not count hub actor markdown without name/description as a subagent", () => {
       mockProject({ "spark-coder.md": "---\nid: 1\nslug: spark-coder\n---\n" })
+      expect(handleSessionStart({ cwd: "/tmp/proj" }, logger)).toBeNull()
+    })
+
+    it("accepts thin delegates for gateway-lane actors", () => {
+      mockProject({
+        "architect.md": "---\\nname: architect\\ndescription: d\\nmodel: opus\\n---\\n",
+        "spark-coder.md": "---\\nname: spark-coder\\ndescription: d\\nmodel: haiku\\ntools: Bash\\n---\\nnexus actors run spark-coder -p\\n",
+        "spark-review.md": "---\\nname: spark-review\\ndescription: d\\nmodel: haiku\\ntools: Bash\\n---\\nnexus actors run spark-review -p\\n",
+      })
       expect(handleSessionStart({ cwd: "/tmp/proj" }, logger)).toBeNull()
     })
 

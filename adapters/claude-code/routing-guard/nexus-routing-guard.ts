@@ -60,7 +60,7 @@
  *   }
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 import { createFileLogger } from "../../../core/logger.ts"
 import { detectRoutingWarnings } from "../../../core/routing-guard/detect.ts"
 import { formatBanner } from "../../../core/routing-guard/format.ts"
@@ -79,7 +79,7 @@ import type { AgentInfo, ProviderCatalog } from "../../../core/routing-guard/typ
 import { resolveProjectRoot } from "../../../core/project-root.ts"
 import { isEntrypoint } from "../../../core/entrypoint.ts"
 
-const PLUGIN_META = { name: "nexus-routing-guard", version: "1.1.0" } as const
+const PLUGIN_META = { name: "nexus-routing-guard", version: "1.1.1" } as const
 const ENV_ENABLED = "NEXUS_ROUTING_GUARD_ENABLED"
 const ENV_CATALOG_PATH = "NEXUS_ROUTING_GUARD_CATALOG_PATH"
 const ENV_AGENTS_PATH = "NEXUS_ROUTING_GUARD_AGENTS_PATH"
@@ -97,12 +97,18 @@ function readJsonFile<T>(path: string | undefined): T | null {
   }
 }
 
+/** Env override (relative paths are resolved against the project root, as nexus-cli writes them), else the default. */
+function configuredPath(directory: string, envKey: string, fallback: string): string {
+  const fromEnv = process.env[envKey]?.trim()
+  return fromEnv ? resolve(directory, fromEnv) : join(directory, ".nexus", "generated", fallback)
+}
+
 function defaultCatalogPath(directory: string): string {
-  return process.env[ENV_CATALOG_PATH] ?? join(directory, ".nexus", "generated", "routing-catalog.json")
+  return configuredPath(directory, ENV_CATALOG_PATH, "routing-catalog.json")
 }
 
 function defaultAgentsPath(directory: string): string {
-  return process.env[ENV_AGENTS_PATH] ?? join(directory, ".nexus", "generated", "agent-routing.json")
+  return configuredPath(directory, ENV_AGENTS_PATH, "agent-routing.json")
 }
 
 /**

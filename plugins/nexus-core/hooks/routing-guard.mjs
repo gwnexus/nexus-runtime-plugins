@@ -3,7 +3,7 @@
 
 // adapters/claude-code/routing-guard/nexus-routing-guard.ts
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join as join2 } from "node:path";
+import { join as join2, resolve as resolve2 } from "node:path";
 
 // core/logger.ts
 import { appendFileSync, mkdirSync, renameSync, statSync } from "node:fs";
@@ -123,8 +123,26 @@ function parseSubagentFrontmatter(markdown) {
   }
   const name = fields.get("name");
   if (!name || !fields.get("description")) return null;
+  const subagent = { name };
   const model = fields.get("model");
-  return model ? { name, model } : { name };
+  const tools = fields.get("tools");
+  const delegatesTo = markdown.slice(m[0].length).match(/\bnexus actors run\s+([\w.-]+)/)?.[1];
+  if (model) subagent.model = model;
+  if (tools) subagent.tools = tools;
+  if (delegatesTo) subagent.delegatesTo = delegatesTo;
+  return subagent;
+}
+function isThinDelegate(subagent, slug) {
+  if (subagent.delegatesTo === slug) return true;
+  const tools = (subagent.tools ?? "").replace(/^\[|\]$/g, "").split(",").map((t) => t.trim().replace(/^(["'])(.*)\1$/, "$2")).filter(Boolean);
+  return subagent.model?.trim() === "haiku" && tools.length === 1 && tools[0] === "Bash";
+}
+function isUnresolved(actor, lane) {
+  const status = actor.model_status ?? actor.status;
+  if (!status || status === "resolved") return null;
+  if (status === "unresolved_alias") return status;
+  if ((status === "unbound" || status === "profile_missing") && lane === "gateway") return status;
+  return null;
 }
 function actorLane(actor) {
   return actor.lane === "session" || actor.lane === "gateway" ? actor.lane : null;
@@ -136,17 +154,18 @@ function detectLaneWarnings(actors, subagents) {
     const lane = actorLane(actor);
     if (!lane) continue;
     const subagent = subagentByName.get(actor.slug);
-    if (actor.status && actor.status !== "resolved") {
+    const unresolved = isUnresolved(actor, lane);
+    if (unresolved) {
       warnings.push({
         code: "unresolved_actor_model",
         agent: actor.slug,
         provider: lane,
         model: actor.profile_slug ?? actor.route_alias ?? "",
-        message: `Agent "${actor.slug}" has no resolved model on the Nexus side (status "${actor.status}"); it runs on the session default.`
+        message: `Agent "${actor.slug}" has no resolved model on the Nexus side (model_status "${unresolved}").`
       });
     }
     if (lane === "gateway") {
-      if (subagent) {
+      if (subagent && !isThinDelegate(subagent, actor.slug)) {
         warnings.push({
           code: "gateway_actor_in_session",
           agent: actor.slug,
@@ -220,7 +239,7 @@ function isEntrypoint(moduleUrl, argv1 = process.argv[1]) {
 }
 
 // adapters/claude-code/routing-guard/nexus-routing-guard.ts
-var PLUGIN_META = { name: "nexus-routing-guard", version: "1.1.0" };
+var PLUGIN_META = { name: "nexus-routing-guard", version: "1.1.1" };
 var ENV_ENABLED = "NEXUS_ROUTING_GUARD_ENABLED";
 var ENV_CATALOG_PATH = "NEXUS_ROUTING_GUARD_CATALOG_PATH";
 var ENV_AGENTS_PATH = "NEXUS_ROUTING_GUARD_AGENTS_PATH";
@@ -232,11 +251,15 @@ function readJsonFile(path) {
     return null;
   }
 }
+function configuredPath(directory, envKey, fallback) {
+  const fromEnv = process.env[envKey]?.trim();
+  return fromEnv ? resolve2(directory, fromEnv) : join2(directory, ".nexus", "generated", fallback);
+}
 function defaultCatalogPath(directory) {
-  return process.env[ENV_CATALOG_PATH] ?? join2(directory, ".nexus", "generated", "routing-catalog.json");
+  return configuredPath(directory, ENV_CATALOG_PATH, "routing-catalog.json");
 }
 function defaultAgentsPath(directory) {
-  return process.env[ENV_AGENTS_PATH] ?? join2(directory, ".nexus", "generated", "agent-routing.json");
+  return configuredPath(directory, ENV_AGENTS_PATH, "agent-routing.json");
 }
 function resolveCatalogAndAgents(directory) {
   const catalogRaw = readJsonFile(defaultCatalogPath(directory));

@@ -15,7 +15,7 @@ import type { AgentInfo, ProviderCatalog } from "./types.ts"
  *
  * Actor-to-route linkage: newer hubs resolve each actor once and ship
  * `profile_slug` (authoritative), `route_alias` (legacy fallback), `lane`,
- * `session_model` and `status` per actor. The actor's route is looked up by
+ * `session_model` and `model_status` per actor. The actor's route is looked up by
  * `profile_slug`, then `route_alias`. `model_profile_id` is a UUID and never
  * equals a `route_alias`; it is used as a lookup key only for files that
  * carry neither slug nor alias, which keeps the behaviour for older hubs.
@@ -44,7 +44,12 @@ export interface ActorEntry {
   profile_slug?: string
   route_alias?: string
   lane?: string
+  /** explicit | profile | route | default */
+  lane_source?: string
   session_model?: string
+  /** resolved | unresolved_alias | unbound */
+  model_status?: string
+  /** Pre-release name of `model_status`; read as a fallback. */
   status?: string
 }
 
