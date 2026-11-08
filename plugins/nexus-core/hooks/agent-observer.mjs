@@ -439,8 +439,8 @@ var LOCK_FILE = "state.lock";
 var LOCK_WAIT_MS = 1e3;
 var LOCK_STALE_MS = 2e3;
 var sleepCell = new Int32Array(new SharedArrayBuffer(4));
-function withObserverLock(observerDir, fn) {
-  const lockPath = join(observerDir, LOCK_FILE);
+function withObserverLock(observerDir, fn, lockFile = LOCK_FILE) {
+  const lockPath = join(observerDir, lockFile);
   let fd = null;
   try {
     mkdirSync(observerDir, { recursive: true });

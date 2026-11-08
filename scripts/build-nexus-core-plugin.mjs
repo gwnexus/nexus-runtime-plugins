@@ -36,6 +36,7 @@ const ADAPTERS = {
   "routing-guard": "adapters/claude-code/routing-guard/nexus-routing-guard.ts",
   "cost-control": "adapters/claude-code/cost-control/nexus-cost-control.ts",
   "agent-observer": "adapters/claude-code/agent-observer/nexus-agent-observer.ts",
+  "dispatch-inbox": "adapters/claude-code/dispatch-inbox/nexus-dispatch-inbox.ts",
 }
 
 const verify = process.argv.includes("--verify")

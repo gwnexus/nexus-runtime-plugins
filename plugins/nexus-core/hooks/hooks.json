@@ -94,6 +94,14 @@
             "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/hooks/agent-observer.mjs"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/hooks/dispatch-inbox.mjs session-start"
+          }
+        ]
       }
     ],
     "Stop": [
@@ -186,6 +194,14 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/hooks/agent-observer.mjs"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/hooks/dispatch-inbox.mjs session-end"
           }
         ]
       }

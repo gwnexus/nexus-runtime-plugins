@@ -32,6 +32,7 @@ auto-discovery mechanism (`.opencode/plugins/`). Migrated plugins (see
 | [**Headroom Intercept**](./adapters/opencode/headroom-intercept/README.md) | `v0.5.21` | Pre-injection context compression for Nexus MCP tool outputs (OpenCode + Claude Code adapters) |
 | [**Session Guard**](./adapters/opencode/session-guard/README.md) | `v1.2.2` | Enforces session append discipline after code-changing tool calls (OpenCode + Claude Code adapters) |
 | [**Routing Guard**](./adapters/opencode/routing-guard/README.md) | `v1.1.1` | Detects model routing divergence between Nexus config and the effective provider catalog (OpenCode + Claude Code adapters) |
+| [**Dispatch Inbox**](./adapters/claude-code/dispatch-inbox/README.md) | `v1.0.0` | Registers running sessions with the Nexus CLI's Dispatch runner and adds missed Dispatch notices at session start (Claude Code only) |
 | [**Attribution Headers**](./600-attribution-headers/README.md) | `v1.0.0` | Injects session/actor attribution headers on outgoing requests to the Nexus gateway provider |
 
 ## Claude Code plugin marketplace
@@ -226,6 +227,24 @@ provider can be entirely valid while a single model id is wrong.
 
 **Required:** none (no Nexus MCP session needed)
 
+## Dispatch Inbox
+
+**`v1.0.0` · [`adapters/claude-code/dispatch-inbox`](./adapters/claude-code/dispatch-inbox) (Claude Code only)**
+
+Lets the Nexus CLI's Dispatch runner (`nexus dispatch listen`) reach running
+Claude Code sessions, so a new Dispatch or a reply shows up as a short notice
+in the session without a manual sweep.
+
+- **`SessionStart`** -- writes `~/.config/nexus/state/dispatch/sessions/<session_id>.json`
+  (socket and messaging token of the session's cross-session inbox, mode
+  0600, atomic). It then adds notices queued while no session ran as context,
+  newest first, each exactly once.
+- **`SessionEnd`** -- removes the session file.
+
+The token never leaves the 0600 file. Notices never carry a Dispatch body.
+
+**Required:** Nexus CLI with `nexus dispatch listen` (the runner); Claude Code's cross-session inbox
+
 ## Attribution Headers
 
 **`v1.0.0` · [`600-attribution-headers`](./600-attribution-headers)**
@@ -316,6 +335,10 @@ nexus-runtime-plugins/
       helicone.ts
       format.ts
       api.ts
+    dispatch-inbox/
+      types.ts
+      sessions.ts
+      notices.ts
   adapters/                        -- per-runtime hook wiring
     opencode/
       session-guard/
@@ -348,6 +371,9 @@ nexus-runtime-plugins/
         README.md
       cost-control/
         nexus-cost-control.ts
+        README.md
+      dispatch-inbox/              -- Claude Code only
+        nexus-dispatch-inbox.ts
         README.md
 ```
 

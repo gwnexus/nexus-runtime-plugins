@@ -1,10 +1,10 @@
 # nexus-core (Claude Code plugin)
 
-**Marketplace:** `gatewarden-nexus` · **Plugin:** `nexus-core` · **Version:** `1.4.1`
+**Marketplace:** `gatewarden-nexus` · **Plugin:** `nexus-core` · **Version:** `1.5.0`
 
 The Claude Code distribution of this repo's runtime plugins
 (`session-guard`, `headroom-intercept`, `compaction-plus`, `routing-guard`,
-`cost-control`, and the Claude Code-only `agent-observer`), packaged as a single installable Claude Code plugin,
+`cost-control`, and the Claude Code-only `agent-observer` and `dispatch-inbox`), packaged as a single installable Claude Code plugin,
 plus four agents for
 architecture/code/security/documentation review.
 
@@ -36,13 +36,14 @@ full resolution order) before enabling the plugin.
 plugins/nexus-core/
 ├── .claude-plugin/plugin.json   # plugin manifest
 ├── hooks/
-│   ├── hooks.json                # event wiring for all 6 adapters
+│   ├── hooks.json                # event wiring for all 7 adapters
 │   ├── session-guard.mjs         # GENERATED -- do not edit directly
 │   ├── headroom-intercept.mjs    # GENERATED -- do not edit directly
 │   ├── compaction-plus.mjs       # GENERATED -- do not edit directly
 │   ├── routing-guard.mjs         # GENERATED -- do not edit directly
 │   ├── cost-control.mjs          # GENERATED -- do not edit directly
-│   └── agent-observer.mjs        # GENERATED -- do not edit directly
+│   ├── agent-observer.mjs        # GENERATED -- do not edit directly
+│   └── dispatch-inbox.mjs        # GENERATED -- do not edit directly
 ├── schemas/
 │   └── nexus.agent-observation.v1.schema.json   # record schema of observer/events.jsonl
 └── agents/
@@ -80,6 +81,17 @@ registered on `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`,
 Consumers validate against `schemas/nexus.agent-observation.v1.schema.json`.
 See `adapters/claude-code/agent-observer/README.md` for the derivation rules,
 guarantees and known gaps.
+
+## Dispatch inbox
+
+`dispatch-inbox` connects running sessions to the Nexus CLI's Dispatch
+runner (`nexus dispatch listen`). On `SessionStart` it registers the session
+in `~/.config/nexus/state/dispatch/sessions/<session_id>.json` (socket and
+messaging token of Claude Code's cross-session inbox, mode 0600). The runner
+then pushes short Dispatch notices into the running session. On `SessionStart`
+it also adds notices queued while no session ran as context, once each. On
+`SessionEnd` it removes the session file. See
+`adapters/claude-code/dispatch-inbox/README.md`.
 
 ## Agents
 

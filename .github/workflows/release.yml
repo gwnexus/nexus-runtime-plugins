@@ -146,6 +146,16 @@ jobs:
             core/agent-observer/types.ts core-agent-observer-types.ts \
             core/agent-observer/writer.ts core-agent-observer-writer.ts
 
+          # Claude Code-only adapter: no OpenCode counterpart. Ships
+          # the built single-file bundle too.
+          stage dist/dispatch-inbox.zip \
+            adapters/claude-code/dispatch-inbox/nexus-dispatch-inbox.ts claude-code-nexus-dispatch-inbox.ts \
+            adapters/claude-code/dispatch-inbox/README.md claude-code-README.md \
+            plugins/nexus-core/hooks/dispatch-inbox.mjs nexus-dispatch-inbox.mjs \
+            core/dispatch-inbox/types.ts core-dispatch-inbox-types.ts \
+            core/dispatch-inbox/sessions.ts core-dispatch-inbox-sessions.ts \
+            core/dispatch-inbox/notices.ts core-dispatch-inbox-notices.ts
+
           # Combined bundle with all plugins
           stage dist/nexus-runtime-plugins-all.zip \
             adapters/opencode/session-guard/nexus-session-guard.ts opencode-session-guard-nexus-session-guard.ts \
@@ -159,6 +169,7 @@ jobs:
             adapters/opencode/cost-control/nexus-cost-control.ts opencode-cost-control-nexus-cost-control.ts \
             adapters/claude-code/cost-control/nexus-cost-control.ts claude-code-cost-control-nexus-cost-control.ts \
             adapters/claude-code/agent-observer/nexus-agent-observer.ts claude-code-agent-observer-nexus-agent-observer.ts \
+            adapters/claude-code/dispatch-inbox/nexus-dispatch-inbox.ts claude-code-dispatch-inbox-nexus-dispatch-inbox.ts \
             core/logger.ts core-logger.ts \
             core/state-store.ts core-state-store.ts \
             core/session-guard/logic.ts core-session-guard-logic.ts \
@@ -189,7 +200,10 @@ jobs:
             core/agent-observer/state.ts core-agent-observer-state.ts \
             core/agent-observer/transcript.ts core-agent-observer-transcript.ts \
             core/agent-observer/types.ts core-agent-observer-types.ts \
-            core/agent-observer/writer.ts core-agent-observer-writer.ts
+            core/agent-observer/writer.ts core-agent-observer-writer.ts \
+            core/dispatch-inbox/types.ts core-dispatch-inbox-types.ts \
+            core/dispatch-inbox/sessions.ts core-dispatch-inbox-sessions.ts \
+            core/dispatch-inbox/notices.ts core-dispatch-inbox-notices.ts
 
       - name: Upload artifacts (branch push)
         if: github.ref == 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')
@@ -213,4 +227,5 @@ jobs:
             dist/routing-guard.zip
             dist/cost-control.zip
             dist/agent-observer.zip
+            dist/dispatch-inbox.zip
             dist/nexus-runtime-plugins-all.zip

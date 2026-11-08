@@ -74,6 +74,12 @@ describe("built nexus-core hook bundles from an encoded or symlinked path", () =
       payload: { hook_event_name: "SessionStart", session_id: "s" },
       writes: ".nexus/claude/observer/events.jsonl",
     },
+    {
+      bundle: "dispatch-inbox.mjs",
+      mode: "session-start",
+      payload: { hook_event_name: "SessionStart", session_id: "s" },
+      writes: ".nexus/dispatch-inbox.log",
+    },
   ]
 
   function run(script: string, mode: string, payload: Record<string, unknown>, project: string) {

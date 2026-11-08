@@ -52,4 +52,13 @@ describe("nexus-core plugin layout", () => {
     )
     expect(entry?.matcher?.split("|").sort()).toEqual(["clear", "fork", "resume", "startup"])
   })
+
+  it("registers the dispatch inbox on SessionStart and SessionEnd", () => {
+    const hooks = JSON.parse(readFileSync(join(PLUGIN_DIR, "hooks", "hooks.json"), "utf8")).hooks
+    const commands = (event: string): string[] =>
+      hooks[event].flatMap((e: { hooks: { command: string }[] }) => e.hooks.map((h) => h.command))
+    expect(commands("SessionStart").some((c) => c.endsWith("dispatch-inbox.mjs session-start"))).toBe(true)
+    expect(commands("SessionEnd").some((c) => c.endsWith("dispatch-inbox.mjs session-end"))).toBe(true)
+    expect(existsSync(join(PLUGIN_DIR, "hooks", "dispatch-inbox.mjs"))).toBe(true)
+  })
 })
