@@ -20,7 +20,7 @@ import { join } from "node:path"
 
 export const PLUGIN_META = {
   name: "nexus-dispatch-inbox",
-  version: "1.0.0",
+  version: "1.0.1",
 } as const
 
 /** `sessions/<session_id>.json`, read by the runner. */

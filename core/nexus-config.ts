@@ -23,6 +23,12 @@ import { join } from "node:path"
  * NEXUS_PRIVATE_TOKEN without NEXUS_API_URL) is paired with the pinned URL.
  * Without a pinned URL it is skipped.
  * Hooks run outside `nexus run`, so the env source is usually absent.
+ *
+ * Transport: the token is a bearer credential, so only `https://` API URLs
+ * are used; plain `http://` is accepted for loopback hosts only (local
+ * development, tests). A pinned URL that fails this check disables the
+ * resolution entirely (null) rather than falling through to another API; a
+ * later source with an insecure URL is skipped.
  */
 
 export type NexusConfigSource = "env" | "project" | "mcp" | "opencode" | "global"
@@ -43,10 +49,13 @@ export function resolveNexusConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): ResolvedNexusConfig | null {
   const fromEnv = { apiUrl: nonEmpty(env.NEXUS_API_URL), token: nonEmpty(env.NEXUS_PRIVATE_TOKEN) }
-  if (fromEnv.apiUrl && fromEnv.token) return { apiUrl: fromEnv.apiUrl, token: fromEnv.token, source: "env" }
+  if (fromEnv.apiUrl && fromEnv.token) {
+    return isSecureApiUrl(fromEnv.apiUrl) ? { apiUrl: fromEnv.apiUrl, token: fromEnv.token, source: "env" } : null
+  }
 
   const project = readTomlPair(join(directory, ".nexus"))
   const pinned = fromEnv.apiUrl ?? project.apiUrl
+  if (pinned && !isSecureApiUrl(pinned)) return null
   const pinnedUrl = pinned ? normalizeUrl(pinned) : null
 
   const home = env.HOME ?? env.USERPROFILE ?? ""
@@ -66,9 +75,30 @@ export function resolveNexusConfig(
       continue
     }
     if (pinnedUrl && normalizeUrl(c.apiUrl) !== pinnedUrl) continue
+    if (!isSecureApiUrl(c.apiUrl)) continue
     return { apiUrl: c.apiUrl, token: c.token, source }
   }
   return null
+}
+
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"])
+
+/**
+ * True for `https://` URLs, and for `http://` URLs whose host is loopback
+ * (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`). Anything else, including
+ * unparsable values, is rejected: the token must not travel in clear text.
+ */
+export function isSecureApiUrl(url: string): boolean {
+  let parsed: URL
+  try {
+    parsed = new URL(url.trim())
+  } catch {
+    return false
+  }
+  if (parsed.protocol === "https:") return true
+  if (parsed.protocol !== "http:") return false
+  const host = parsed.hostname.toLowerCase()
+  return LOOPBACK_HOSTS.has(host) || host.endsWith(".localhost") || /^127(\.\d{1,3}){3}$/.test(host)
 }
 
 /** `config.toml` `api_url` + `credentials.toml` `token` from one directory. */

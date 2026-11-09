@@ -122,7 +122,7 @@ describe("SessionStart / SessionEnd", () => {
     const first = handleSessionStart({ session_id: SESSION }, project, log, env()) as any
     expect(first.hookSpecificOutput.hookEventName).toBe("SessionStart")
     const ctx: string = first.hookSpecificOutput.additionalContext
-    expect(ctx.split("\n").slice(1, 3)).toEqual(["- Nexus: new Dispatch n3.", "- Nexus: new Dispatch n1."])
+    expect(ctx.split("\n").slice(3, 5)).toEqual(["- Nexus: new Dispatch n3.", "- Nexus: new Dispatch n1."])
     expect(ctx).not.toContain("n2")
     expect(handleSessionStart({ session_id: "next-session" }, project, log, env())).toBeNull()
     const delivered = readFileSync(join(state, "notices", `${P}.delivered.claude.jsonl`), "utf-8")

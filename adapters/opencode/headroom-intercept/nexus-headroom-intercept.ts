@@ -27,7 +27,7 @@ import {
  */
 const PLUGIN_META = {
   name: "nexus-headroom-intercept",
-  version: "0.5.21",
+  version: "0.5.22",
 } as const
 
 const REQUIRED_SDK_MAJOR = 1

@@ -42,7 +42,7 @@ export async function queryHeliconeSession(
 
     if (!res.ok) {
       const body = await res.text().catch(() => "")
-      onLog?.("error", `Helicone API ${res.status}: ${body}`)
+      onLog?.("error", `Helicone API ${res.status}: ${truncateForLog(body)}`)
       return null
     }
 
@@ -99,4 +99,10 @@ export async function queryHeliconeSession(
     onLog?.("error", `Helicone query failed: ${err}`)
     return null
   }
+}
+
+/** Error bodies go to a local log: single line, at most 200 characters. */
+export function truncateForLog(body: string, max = 200): string {
+  const flat = body.replace(/\s+/g, " ").trim()
+  return flat.length > max ? `${flat.slice(0, max)}… (${flat.length} chars)` : flat
 }

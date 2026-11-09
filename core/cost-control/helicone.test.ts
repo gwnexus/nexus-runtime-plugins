@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { queryHeliconeSession } from "./helicone.ts"
+import { queryHeliconeSession, truncateForLog } from "./helicone.ts"
 
 describe("cost-control core helicone client", () => {
   const config = { apiKey: "sk-helicone-123" }
@@ -63,5 +63,20 @@ describe("cost-control core helicone client", () => {
   it("returns null and does not throw on a network error", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")))
     await expect(queryHeliconeSession(config, "nexus-sess-1")).resolves.toBeNull()
+  })
+
+  it("logs a long error body as one truncated line", async () => {
+    const body = "line1\n" + "x".repeat(1000)
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => body }))
+    const logs: string[] = []
+    await queryHeliconeSession(config, "s-1", (_level, message) => logs.push(message))
+    const line = logs.find((l) => l.startsWith("Helicone API 500"))!
+    expect(line).not.toContain("\n")
+    expect(line.length).toBeLessThan(260)
+    expect(line).toContain("(1006 chars)")
+  })
+
+  it("truncateForLog keeps short bodies unchanged", () => {
+    expect(truncateForLog("  unauthorized \n")).toBe("unauthorized")
   })
 })

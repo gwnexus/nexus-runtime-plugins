@@ -1,6 +1,6 @@
 # nexus-core (Claude Code plugin)
 
-**Marketplace:** `gatewarden-nexus` · **Plugin:** `nexus-core` · **Version:** `1.5.0`
+**Marketplace:** `gatewarden-nexus` · **Plugin:** `nexus-core` · **Version:** `1.5.1`
 
 The Claude Code distribution of this repo's runtime plugins
 (`session-guard`, `headroom-intercept`, `compaction-plus`, `routing-guard`,
@@ -29,6 +29,11 @@ Set `NEXUS_API_URL` and `NEXUS_PRIVATE_TOKEN` in your environment (or a
 project-local `.nexus/config.toml` + `.nexus/credentials.toml`, or `.mcp.json`
 `mcpServers.nexus.env` -- see `core/headroom-intercept/config.ts` for the
 full resolution order) before enabling the plugin.
+
+The API URL must use `https://`. Plain `http://` is accepted only for
+loopback hosts (`localhost`, `127.0.0.0/8`, `::1`), so the private token is
+never sent in clear text. A pinned URL that fails this check disables the
+Nexus calls instead of falling back to another source.
 
 ## Structure
 

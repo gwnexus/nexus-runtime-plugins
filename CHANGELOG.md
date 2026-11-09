@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **`nexus-core` v1.5.1 -- security scan follow-ups: untrusted Dispatch notices fenced, HTTPS required for the Nexus API, dependencies and CI hardened.**
+  - **Dispatch notices fenced as untrusted data (`nexus-dispatch-inbox` 1.0.1).**
+    - The session-start catch-up placed notice texts in the agent context without marking them, although they are built from Dispatch titles that any linked project can set.
+    - The notices now sit between `[NEXUS DISPATCH NOTICES: UNTRUSTED DATA]` and `[/NEXUS DISPATCH NOTICES]`, preceded by an instruction not to follow anything inside.
+    - Each notice is one line: control and Unicode line-separator characters are flattened, square brackets become parentheses (a notice cannot fake the closing marker), and the line is capped at 300 characters.
+  - **HTTPS required for the Nexus API (`core/nexus-config.ts`).**
+    - `resolveNexusConfig()` accepted any `api_url` / `NEXUS_API_URL`, so a mistyped `http://` URL sent the bearer token in clear text.
+    - Only `https://` URLs are used now. Plain `http://` is allowed for loopback hosts only (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`).
+    - An insecure pinned URL (env or project-local) disables the resolution instead of falling through to another API. A later source with an insecure URL is skipped.
+    - The new `isSecureApiUrl()` is exported.
+  - **Helicone error bodies truncated.** cost-control logged Helicone error responses verbatim. The new `truncateForLog()` writes them as one line of at most 200 characters.
+  - **Dependencies and CI.**
+    - vitest 4.1.11 to 4.1.12 (GHSA-qxg6-89mg-rqv8, GHSA-xp26-3454-mjgp; dev only, not in the bundles).
+    - GitHub Actions in `ci.yml` and `release.yml` are pinned to commit SHAs.
+    - The new `.github/dependabot.yml` keeps the actions and npm dev tooling current.
+    - `.gitignore` covers key material (`*.pem`, `*.key`, `*.p12`, `*.pfx`, SSH keys).
+    - Still open, not reachable from plugin code: the `effect`, `zod` and `toml` advisories under the dev-only `@opencode-ai/plugin`, waiting for upstream.
+  - New tests:
+    - Fencing and a hostile notice that tries to close the block (`core/dispatch-inbox/dispatch-inbox.test.ts`).
+    - HTTPS enforcement, insecure pinned URL, insecure later source and loopback cases, plus `isSecureApiUrl` (`core/nexus-config.test.ts`).
+    - Helicone error truncation (`core/cost-control/helicone.test.ts`).
+    - 439/439 tests pass.
+  - Versions: `nexus-cost-control` 1.2.5, `nexus-compaction-plus` 1.8.6, `nexus-headroom-intercept` 0.5.22, `nexus-session-guard` 1.2.3, `nexus-dispatch-inbox` 1.0.1. `nexus-core` bundles rebuilt.
+
 ### Added
 - **`nexus-dispatch-inbox` v1.0.0 + `nexus-core` v1.5.0: Dispatch notices in running Claude Code sessions.** The Nexus CLI's Dispatch runner (`nexus dispatch listen`) pushes short Dispatch notices into running sessions through Claude Code's cross-session inbox, but it cannot discover sessions by itself. Only the session knows its socket and messaging token.
   - **Session registration.** A new `SessionStart` hook writes `~/.config/nexus/state/dispatch/sessions/<session_id>.json` (`session_id`, `cwd`, `socket`, `token`, `started_at`). `socket` and `token` come from `CLAUDE_CODE_MESSAGING_SOCKET` and `CLAUDE_CODE_MESSAGING_TOKEN`, and the file is written only when both are set. It is written atomically with mode 0600; a missing directory is created with 0700. A new `SessionEnd` hook deletes it.

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { resolveNexusConfig } from "./nexus-config.ts"
+import { isSecureApiUrl, resolveNexusConfig } from "./nexus-config.ts"
 
 let base: string
 let project: string
@@ -178,5 +178,51 @@ describe("resolveNexusConfig", () => {
     expect(resolveNexusConfig(join(base, "missing"), { HOME: join(base, "nohome") })).toBeNull()
     globalToml("https://prod.example", "prod-token")
     expect(resolveNexusConfig(project, env())?.source).toBe("global")
+  })
+
+  it("never sends the token over plain http to a non-loopback host", () => {
+    expect(
+      resolveNexusConfig(project, { ...env(), NEXUS_API_URL: "http://api.example", NEXUS_PRIVATE_TOKEN: "env-token" }),
+    ).toBeNull()
+    projectToml("http://staging.example", "project-token")
+    globalToml("https://staging.example", "global-token")
+    // An insecure pinned URL disables resolution instead of falling through.
+    expect(resolveNexusConfig(project, env())).toBeNull()
+  })
+
+  it("skips a later source with an insecure URL and uses the next one", () => {
+    mcpJson("http://mcp.example", "mcp-token")
+    globalToml("https://prod.example", "prod-token")
+    expect(resolveNexusConfig(project, env())).toEqual({
+      apiUrl: "https://prod.example",
+      token: "prod-token",
+      source: "global",
+    })
+  })
+
+  it("allows plain http for loopback hosts", () => {
+    expect(
+      resolveNexusConfig(project, { ...env(), NEXUS_API_URL: "http://127.0.0.1:4000", NEXUS_PRIVATE_TOKEN: "t" })?.source,
+    ).toBe("env")
+  })
+})
+
+describe("isSecureApiUrl", () => {
+  it.each([
+    ["https://api.example", true],
+    ["HTTPS://API.EXAMPLE/", true],
+    ["http://localhost:3000", true],
+    ["http://app.localhost", true],
+    ["http://127.0.0.1:8080", true],
+    ["http://127.1.2.3", true],
+    ["http://[::1]:4000", true],
+    ["http://api.example", false],
+    ["http://127.0.0.1.evil.example", false],
+    ["http://localhost.evil.example", false],
+    ["ftp://api.example", false],
+    ["api.example", false],
+    ["", false],
+  ])("%s -> %s", (url, ok) => {
+    expect(isSecureApiUrl(url)).toBe(ok)
   })
 })

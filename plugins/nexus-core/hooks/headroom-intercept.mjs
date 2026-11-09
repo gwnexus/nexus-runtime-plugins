@@ -687,9 +687,12 @@ import { readFileSync as readFileSync4 } from "node:fs";
 import { join as join4 } from "node:path";
 function resolveNexusConfig(directory, env = process.env) {
   const fromEnv = { apiUrl: nonEmpty(env.NEXUS_API_URL), token: nonEmpty(env.NEXUS_PRIVATE_TOKEN) };
-  if (fromEnv.apiUrl && fromEnv.token) return { apiUrl: fromEnv.apiUrl, token: fromEnv.token, source: "env" };
+  if (fromEnv.apiUrl && fromEnv.token) {
+    return isSecureApiUrl(fromEnv.apiUrl) ? { apiUrl: fromEnv.apiUrl, token: fromEnv.token, source: "env" } : null;
+  }
   const project = readTomlPair(join4(directory, ".nexus"));
   const pinned = fromEnv.apiUrl ?? project.apiUrl;
+  if (pinned && !isSecureApiUrl(pinned)) return null;
   const pinnedUrl = pinned ? normalizeUrl(pinned) : null;
   const home = env.HOME ?? env.USERPROFILE ?? "";
   const later = [
@@ -707,9 +710,23 @@ function resolveNexusConfig(directory, env = process.env) {
       continue;
     }
     if (pinnedUrl && normalizeUrl(c.apiUrl) !== pinnedUrl) continue;
+    if (!isSecureApiUrl(c.apiUrl)) continue;
     return { apiUrl: c.apiUrl, token: c.token, source };
   }
   return null;
+}
+var LOOPBACK_HOSTS = /* @__PURE__ */ new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+function isSecureApiUrl(url) {
+  let parsed;
+  try {
+    parsed = new URL(url.trim());
+  } catch {
+    return false;
+  }
+  if (parsed.protocol === "https:") return true;
+  if (parsed.protocol !== "http:") return false;
+  const host = parsed.hostname.toLowerCase();
+  return LOOPBACK_HOSTS.has(host) || host.endsWith(".localhost") || /^127(\.\d{1,3}){3}$/.test(host);
 }
 function readTomlPair(dir) {
   return {
@@ -1063,7 +1080,7 @@ function isEntrypoint(moduleUrl, argv1 = process.argv[1]) {
 }
 
 // adapters/claude-code/headroom-intercept/nexus-headroom-intercept.ts
-var PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.21" };
+var PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.22" };
 var DEFAULT_MODE = "observe";
 var DEBUG = process.env.HEADROOM_DEBUG === "true";
 var GATE_STATE_FILE = "headroom-gate-state.json";
