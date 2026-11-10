@@ -1,6 +1,6 @@
 # nexus-core (Claude Code plugin)
 
-**Marketplace:** `gatewarden-nexus` · **Plugin:** `nexus-core` · **Version:** `1.5.1`
+**Marketplace:** `gatewarden-nexus` · **Plugin:** `nexus-core` · **Version:** `1.5.2`
 
 The Claude Code distribution of this repo's runtime plugins
 (`session-guard`, `headroom-intercept`, `compaction-plus`, `routing-guard`,
@@ -34,6 +34,14 @@ The API URL must use `https://`. Plain `http://` is accepted only for
 loopback hosts (`localhost`, `127.0.0.0/8`, `::1`), so the private token is
 never sent in clear text. A pinned URL that fails this check disables the
 Nexus calls instead of falling back to another source.
+
+A repository can set `api_url` in its own `.nexus/config.toml`. A token from
+another source (environment, `.mcp.json`, `opencode.json`, global config) is
+only sent to that URL when the operator approved the host. Approval comes
+from `NEXUS_API_URL`, from the `api_url` of the global
+`~/.config/nexus/config.toml`, or from a comma-separated list in
+`NEXUS_TRUSTED_API_URLS`. A project linked with `nexus link` / `nexus pull`
+(`config.toml` and `credentials.toml` together) needs no approval.
 
 ## Structure
 

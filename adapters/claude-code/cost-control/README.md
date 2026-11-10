@@ -102,9 +102,17 @@ Credentials are resolved by `core/nexus-config.ts`, first complete source wins:
 4. `opencode.json` (`mcp.nexus.environment`)
 5. global `~/.config/nexus/config.toml` + `credentials.toml`
 
-URL and token always come from the same source. When the project-local
+URL and token normally come from the same source. When the project-local
 config sets `api_url`, later sources are used only if they point at that
 same API, so a project linked to a staging hub never posts to production.
+
+`.nexus/config.toml` is part of the repository, so its `api_url` is not
+trusted on its own. A token from another source (environment, `.mcp.json`,
+`opencode.json`, global config) is paired with it only when the operator
+approved that host: the origin matches `NEXUS_API_URL`, the `api_url` of the
+global `~/.config/nexus/config.toml`, or an entry of `NEXUS_TRUSTED_API_URLS`
+(comma-separated, e.g. `https://staging.example,https://api.example`).
+Otherwise no credentials resolve and nothing is sent.
 The log names the source (`env`, `project`, `mcp`, `opencode`, `global`),
 never the token.
 

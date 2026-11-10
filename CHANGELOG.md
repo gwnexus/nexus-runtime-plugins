@@ -8,6 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Security
+- **`nexus-core` v1.5.2 -- a repository-controlled `api_url` could receive the developer's Nexus token.**
+  - **The problem.** `.nexus/config.toml` is part of the checked-out repository, but `resolveNexusConfig()` treated its `api_url` as pinned and paired it with a token from another source that carried no URL: `NEXUS_PRIVATE_TOKEN` without `NEXUS_API_URL`, a token-only `.mcp.json` or `opencode.json` entry, or the global `credentials.toml`. A repository that set `api_url` to its own HTTPS host received the developer's token as soon as a hook reached the API. Affected hooks: compaction-plus, cost-control, headroom-intercept and the session-guard release-line check.
+  - **The fix.** A token from one source is now paired with a URL from another source only when the operator approved that URL:
+    - the URL comes from `NEXUS_API_URL`; or
+    - its origin (scheme, host, port) equals the `api_url` of the global `~/.config/nexus/config.toml`; or
+    - its origin is listed in the new `NEXUS_TRUSTED_API_URLS` (comma-separated).
+
+    Same-source pairs need no approval. These are the project's own `config.toml` and `credentials.toml` as written by `nexus link` / `nexus pull`, and `.mcp.json` or `opencode.json` entries that carry both URL and token. An unapproved cross-source pair resolves to no credentials, and nothing is sent.
+  - **Migration.** A project that pins `api_url` in `.nexus/config.toml` and has its token only in the environment, a token-only `.mcp.json` or the global credentials keeps working once the operator does one of the following:
+    - sets `NEXUS_TRUSTED_API_URLS` to that URL;
+    - uses the same host as the global config's `api_url`;
+    - runs `nexus link` / `nexus pull`, which writes the project-local `credentials.toml`.
+  - New tests in `core/nexus-config.test.ts`:
+    - the attack case: a repo-pinned host with an env, `.mcp.json`, `opencode.json` or global token;
+    - approval by the global `api_url` and by `NEXUS_TRUSTED_API_URLS`;
+    - the documented `nexus link` and env-URL workflows;
+    - `approvedOrigins()`.
+
+    Three earlier cases now assert the approval step. 444/444 tests pass.
+  - Versions: `nexus-cost-control` 1.2.6, `nexus-compaction-plus` 1.8.7, `nexus-headroom-intercept` 0.5.23, `nexus-session-guard` 1.2.4. Every `nexus-core` bundle that uses the resolver is rebuilt (`compaction-plus`, `cost-control`, `headroom-intercept`, `session-guard`).
+
+### Security
 - **`nexus-core` v1.5.1 -- security scan follow-ups: untrusted Dispatch notices fenced, HTTPS required for the Nexus API, dependencies and CI hardened.**
   - **Dispatch notices fenced as untrusted data (`nexus-dispatch-inbox` 1.0.1).**
     - The session-start catch-up placed notice texts in the agent context without marking them, although they are built from Dispatch titles that any linked project can set.

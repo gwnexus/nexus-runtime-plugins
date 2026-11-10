@@ -64,7 +64,7 @@ function saveState(directory, fileName, state) {
 // core/session-guard/logic.ts
 var PLUGIN_META = {
   name: "nexus-session-guard",
-  version: "1.2.3",
+  version: "1.2.4",
   description: "Detects code-changing tool completions and reminds the agent to call nexus_session_append before proceeding."
 };
 var DEFAULT_TRIGGER_TOOLS = /* @__PURE__ */ new Set(["Edit", "Write", "MultiEdit"]);
@@ -157,18 +157,20 @@ function resolveNexusConfig(directory, env = process.env) {
   if (pinned && !isSecureApiUrl(pinned)) return null;
   const pinnedUrl = pinned ? normalizeUrl(pinned) : null;
   const home = env.HOME ?? env.USERPROFILE ?? "";
+  const global = home ? readTomlPair(join3(home, ".config", "nexus")) : {};
+  const pinnedApproved = !!pinned && (!!fromEnv.apiUrl || approvedOrigins(env, global.apiUrl).has(urlOrigin(pinned) ?? ""));
   const later = [
     ["project", () => project],
     ["env", () => fromEnv],
     ["mcp", () => readJsonEnv(join3(directory, ".mcp.json"), (j) => j?.mcpServers?.nexus?.env)],
     ["opencode", () => readJsonEnv(join3(directory, "opencode.json"), (j) => j?.mcp?.nexus?.environment)],
-    ["global", () => home ? readTomlPair(join3(home, ".config", "nexus")) : {}]
+    ["global", () => global]
   ];
   for (const [source, read] of later) {
     const c = read();
     if (!c.token) continue;
     if (!c.apiUrl) {
-      if (pinned) return { apiUrl: pinned, token: c.token, source };
+      if (pinned && pinnedApproved) return { apiUrl: pinned, token: c.token, source };
       continue;
     }
     if (pinnedUrl && normalizeUrl(c.apiUrl) !== pinnedUrl) continue;
@@ -189,6 +191,22 @@ function isSecureApiUrl(url) {
   if (parsed.protocol !== "http:") return false;
   const host = parsed.hostname.toLowerCase();
   return LOOPBACK_HOSTS.has(host) || host.endsWith(".localhost") || /^127(\.\d{1,3}){3}$/.test(host);
+}
+function urlOrigin(url) {
+  try {
+    return new URL(url.trim()).origin.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+function approvedOrigins(env, globalApiUrl) {
+  const urls = [globalApiUrl ?? "", ...(env.NEXUS_TRUSTED_API_URLS ?? "").split(",")];
+  const out = /* @__PURE__ */ new Set();
+  for (const u of urls) {
+    const o = u.trim() ? urlOrigin(u) : null;
+    if (o && o !== "null") out.add(o);
+  }
+  return out;
 }
 function readTomlPair(dir) {
   return {

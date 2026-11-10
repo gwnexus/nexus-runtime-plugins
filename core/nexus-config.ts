@@ -20,8 +20,21 @@ import { join } from "node:path"
  * developer who selected e.g. staging never falls through to production
  * credentials. The one exception: a later source that carries a token but no
  * URL (e.g. a project `credentials.toml` without `api_url`, or
- * NEXUS_PRIVATE_TOKEN without NEXUS_API_URL) is paired with the pinned URL.
- * Without a pinned URL it is skipped.
+ * NEXUS_PRIVATE_TOKEN without NEXUS_API_URL) is paired with the pinned URL,
+ * but only when the operator approved that URL. Without an approved pinned
+ * URL it is skipped.
+ *
+ * Operator approval: `.nexus/config.toml` is part of the checked-out
+ * repository, so its `api_url` is repository-controlled. Pairing it with a
+ * token from another source (environment, `.mcp.json`, `opencode.json`,
+ * global config) would let a repository route the developer's token to a
+ * host of its choice. Such a cross-source pair is used only when the pinned
+ * URL comes from `NEXUS_API_URL`, or its origin (scheme, host, port) is
+ * approved by the operator: the `api_url` of the global
+ * `~/.config/nexus/config.toml`, or an entry of `NEXUS_TRUSTED_API_URLS`
+ * (comma-separated). A source that carries both URL and token (the project's
+ * own `config.toml` + `credentials.toml`, or `.mcp.json` with both) is a
+ * same-source pair and needs no approval.
  * Hooks run outside `nexus run`, so the env source is usually absent.
  *
  * Transport: the token is a bearer credential, so only `https://` API URLs
@@ -59,19 +72,24 @@ export function resolveNexusConfig(
   const pinnedUrl = pinned ? normalizeUrl(pinned) : null
 
   const home = env.HOME ?? env.USERPROFILE ?? ""
+  const global = home ? readTomlPair(join(home, ".config", "nexus")) : {}
+  // A token from one source may only travel to a URL from another source
+  // when the operator chose or approved that URL (see header).
+  const pinnedApproved =
+    !!pinned && (!!fromEnv.apiUrl || approvedOrigins(env, global.apiUrl).has(urlOrigin(pinned) ?? ""))
   const later: Array<[NexusConfigSource, () => Candidate]> = [
     ["project", () => project],
     ["env", () => fromEnv],
     ["mcp", () => readJsonEnv(join(directory, ".mcp.json"), (j) => j?.mcpServers?.nexus?.env)],
     ["opencode", () => readJsonEnv(join(directory, "opencode.json"), (j) => j?.mcp?.nexus?.environment)],
-    ["global", () => (home ? readTomlPair(join(home, ".config", "nexus")) : {})],
+    ["global", () => global],
   ]
   for (const [source, read] of later) {
     const c = read()
     if (!c.token) continue
     if (!c.apiUrl) {
-      // Token-only source: usable only with the pinned API.
-      if (pinned) return { apiUrl: pinned, token: c.token, source }
+      // Token-only source: usable only with an operator-approved pinned API.
+      if (pinned && pinnedApproved) return { apiUrl: pinned, token: c.token, source }
       continue
     }
     if (pinnedUrl && normalizeUrl(c.apiUrl) !== pinnedUrl) continue
@@ -99,6 +117,30 @@ export function isSecureApiUrl(url: string): boolean {
   if (parsed.protocol !== "http:") return false
   const host = parsed.hostname.toLowerCase()
   return LOOPBACK_HOSTS.has(host) || host.endsWith(".localhost") || /^127(\.\d{1,3}){3}$/.test(host)
+}
+
+/** `scheme://host[:port]` of a URL, lower-cased; null when unparsable. */
+function urlOrigin(url: string): string | null {
+  try {
+    return new URL(url.trim()).origin.toLowerCase()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Origins the operator approved for cross-source token pairing: the global
+ * config's `api_url` and every entry of `NEXUS_TRUSTED_API_URLS`. Both live
+ * outside the repository.
+ */
+export function approvedOrigins(env: NodeJS.ProcessEnv, globalApiUrl?: string): Set<string> {
+  const urls = [globalApiUrl ?? "", ...(env.NEXUS_TRUSTED_API_URLS ?? "").split(",")]
+  const out = new Set<string>()
+  for (const u of urls) {
+    const o = u.trim() ? urlOrigin(u) : null
+    if (o && o !== "null") out.add(o)
+  }
+  return out
 }
 
 /** `config.toml` `api_url` + `credentials.toml` `token` from one directory. */

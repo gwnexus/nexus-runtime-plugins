@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { isSecureApiUrl, resolveNexusConfig } from "./nexus-config.ts"
+import { approvedOrigins, isSecureApiUrl, resolveNexusConfig } from "./nexus-config.ts"
 
 let base: string
 let project: string
@@ -120,23 +120,32 @@ describe("resolveNexusConfig", () => {
     })
   })
 
-  it("pairs a token-only later source with the project's pinned API", () => {
+  it("pairs a token-only later source with the project's pinned API once the operator trusts it", () => {
     projectToml("https://staging.example", null)
     writeFileSync(
       join(project, ".mcp.json"),
       JSON.stringify({ mcpServers: { nexus: { env: { NEXUS_PRIVATE_TOKEN: "mcp-token" } } } }),
     )
-    expect(resolveNexusConfig(project, env())).toEqual({
+    expect(resolveNexusConfig(project, env())).toBeNull()
+    expect(resolveNexusConfig(project, { ...env(), NEXUS_TRUSTED_API_URLS: "https://staging.example/" })).toEqual({
       apiUrl: "https://staging.example",
       token: "mcp-token",
       source: "mcp",
     })
   })
 
-  it("pairs a token-only env with the project's pinned API", () => {
+  it("pairs a token-only env with the project's pinned API only when trusted", () => {
     projectToml("https://staging.example", null)
     mcpJson("https://staging.example", "mcp-token")
-    expect(resolveNexusConfig(project, { ...env(), NEXUS_PRIVATE_TOKEN: "env-token" })).toEqual({
+    // Untrusted: the env token is skipped; .mcp.json is a same-source pair.
+    expect(resolveNexusConfig(project, { ...env(), NEXUS_PRIVATE_TOKEN: "env-token" })?.source).toBe("mcp")
+    expect(
+      resolveNexusConfig(project, {
+        ...env(),
+        NEXUS_PRIVATE_TOKEN: "env-token",
+        NEXUS_TRUSTED_API_URLS: "https://other.example, https://staging.example",
+      }),
+    ).toEqual({
       apiUrl: "https://staging.example",
       token: "env-token",
       source: "env",
@@ -147,7 +156,8 @@ describe("resolveNexusConfig", () => {
     projectToml("https://staging.example", null)
     mcpJson("https://prod.example", "prod-token")
     writeFileSync(join(home, ".config", "nexus", "credentials.toml"), `token = "global-token"\n`)
-    expect(resolveNexusConfig(project, env())).toEqual({
+    expect(resolveNexusConfig(project, env())).toBeNull()
+    expect(resolveNexusConfig(project, { ...env(), NEXUS_TRUSTED_API_URLS: "https://staging.example" })).toEqual({
       apiUrl: "https://staging.example",
       token: "global-token",
       source: "global",
@@ -202,8 +212,67 @@ describe("resolveNexusConfig", () => {
 
   it("allows plain http for loopback hosts", () => {
     expect(
-      resolveNexusConfig(project, { ...env(), NEXUS_API_URL: "http://127.0.0.1:4000", NEXUS_PRIVATE_TOKEN: "t" })?.source,
+      resolveNexusConfig(project, { ...env(), NEXUS_API_URL: "http://127.0.0.1:4000", NEXUS_PRIVATE_TOKEN: "t" })
+        ?.source,
     ).toBe("env")
+  })
+})
+
+describe("resolveNexusConfig: repository-controlled api_url", () => {
+  const evil = "https://collector.attacker.example"
+
+  it("never sends an env token to a repo-pinned host (attack case)", () => {
+    projectToml(evil, null)
+    expect(resolveNexusConfig(project, { ...env(), NEXUS_PRIVATE_TOKEN: "operator-token" })).toBeNull()
+  })
+
+  it("never sends a .mcp.json, opencode.json or global token to a repo-pinned host", () => {
+    projectToml(evil, null)
+    writeFileSync(
+      join(project, ".mcp.json"),
+      JSON.stringify({ mcpServers: { nexus: { env: { NEXUS_PRIVATE_TOKEN: "mcp-token" } } } }),
+    )
+    writeFileSync(
+      join(project, "opencode.json"),
+      JSON.stringify({ mcp: { nexus: { environment: { NEXUS_PRIVATE_TOKEN: "oc-token" } } } }),
+    )
+    globalToml("https://prod.example", "global-token")
+    expect(resolveNexusConfig(project, env())).toBeNull()
+  })
+
+  it("approves the repo-pinned host when it is the global config's api_url", () => {
+    projectToml("https://staging.example/api", null)
+    globalToml("https://STAGING.example", "global-token")
+    // Same origin as the global api_url: the global pair matches by origin approval.
+    expect(resolveNexusConfig(project, { ...env(), NEXUS_PRIVATE_TOKEN: "env-token" })).toEqual({
+      apiUrl: "https://staging.example/api",
+      token: "env-token",
+      source: "env",
+    })
+  })
+
+  it("keeps the documented workflows working", () => {
+    // nexus link / pull: project config.toml + credentials.toml (same source)
+    projectToml(evil, "project-token")
+    expect(resolveNexusConfig(project, { ...env(), NEXUS_PRIVATE_TOKEN: "env-token" })?.source).toBe("project")
+    // env URL (operator) + project token without api_url
+    rmSync(join(project, ".nexus", "config.toml"))
+    expect(resolveNexusConfig(project, { ...env(), NEXUS_API_URL: "https://staging.example" })).toEqual({
+      apiUrl: "https://staging.example",
+      token: "project-token",
+      source: "project",
+    })
+  })
+
+  it("approvedOrigins reads the global api_url and the trusted list, ignoring junk", () => {
+    expect(
+      [
+        ...approvedOrigins(
+          { NEXUS_TRUSTED_API_URLS: " https://A.example/x , not a url,,http://localhost:3000" },
+          "https://g.example/",
+        ),
+      ].sort(),
+    ).toEqual(["http://localhost:3000", "https://a.example", "https://g.example"])
   })
 })
 

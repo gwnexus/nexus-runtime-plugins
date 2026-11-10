@@ -695,18 +695,20 @@ function resolveNexusConfig(directory, env = process.env) {
   if (pinned && !isSecureApiUrl(pinned)) return null;
   const pinnedUrl = pinned ? normalizeUrl(pinned) : null;
   const home = env.HOME ?? env.USERPROFILE ?? "";
+  const global = home ? readTomlPair(join4(home, ".config", "nexus")) : {};
+  const pinnedApproved = !!pinned && (!!fromEnv.apiUrl || approvedOrigins(env, global.apiUrl).has(urlOrigin(pinned) ?? ""));
   const later = [
     ["project", () => project],
     ["env", () => fromEnv],
     ["mcp", () => readJsonEnv(join4(directory, ".mcp.json"), (j) => j?.mcpServers?.nexus?.env)],
     ["opencode", () => readJsonEnv(join4(directory, "opencode.json"), (j) => j?.mcp?.nexus?.environment)],
-    ["global", () => home ? readTomlPair(join4(home, ".config", "nexus")) : {}]
+    ["global", () => global]
   ];
   for (const [source, read] of later) {
     const c = read();
     if (!c.token) continue;
     if (!c.apiUrl) {
-      if (pinned) return { apiUrl: pinned, token: c.token, source };
+      if (pinned && pinnedApproved) return { apiUrl: pinned, token: c.token, source };
       continue;
     }
     if (pinnedUrl && normalizeUrl(c.apiUrl) !== pinnedUrl) continue;
@@ -727,6 +729,22 @@ function isSecureApiUrl(url) {
   if (parsed.protocol !== "http:") return false;
   const host = parsed.hostname.toLowerCase();
   return LOOPBACK_HOSTS.has(host) || host.endsWith(".localhost") || /^127(\.\d{1,3}){3}$/.test(host);
+}
+function urlOrigin(url) {
+  try {
+    return new URL(url.trim()).origin.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+function approvedOrigins(env, globalApiUrl) {
+  const urls = [globalApiUrl ?? "", ...(env.NEXUS_TRUSTED_API_URLS ?? "").split(",")];
+  const out = /* @__PURE__ */ new Set();
+  for (const u of urls) {
+    const o = u.trim() ? urlOrigin(u) : null;
+    if (o && o !== "null") out.add(o);
+  }
+  return out;
 }
 function readTomlPair(dir) {
   return {
@@ -1080,7 +1098,7 @@ function isEntrypoint(moduleUrl, argv1 = process.argv[1]) {
 }
 
 // adapters/claude-code/headroom-intercept/nexus-headroom-intercept.ts
-var PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.22" };
+var PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.23" };
 var DEFAULT_MODE = "observe";
 var DEBUG = process.env.HEADROOM_DEBUG === "true";
 var GATE_STATE_FILE = "headroom-gate-state.json";
