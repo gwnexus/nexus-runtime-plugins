@@ -126,7 +126,13 @@ export function handleSessionStart(
 
   const pending = withObserverLock(
     noticesDir(stateDir),
-    () => {
+    (locked) => {
+      // Without the lock another session may be recording the same notices;
+      // leave them pending for a later session instead of injecting twice.
+      if (!locked) {
+        log("warn", "Catch-up skipped: notice lock held by another session; notices stay pending")
+        return []
+      }
       const notices = readNotices(stateDir, projectId)
       if (notices.length === 0) return []
       const due = selectPending(notices, readDeliveredIds(stateDir, projectId), now)

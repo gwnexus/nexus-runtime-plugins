@@ -135,6 +135,18 @@ describe("SessionStart / SessionEnd", () => {
     ])
   })
 
+  it("injects nothing while another session holds the notice lock, and leaves notices pending", () => {
+    queue([{ id: "n1", created_at: recent(10) }])
+    const lock = join(state, "notices", `${P}.claude.lock`)
+    writeFileSync(lock, "")
+    expect(handleSessionStart({ session_id: SESSION }, project, log, env())).toBeNull()
+    expect(existsSync(join(state, "notices", `${P}.delivered.claude.jsonl`))).toBe(false)
+    expect(logs.some((l) => l.startsWith("warn") && l.includes("lock"))).toBe(true)
+    rmSync(lock)
+    const out = handleSessionStart({ session_id: "next-session" }, project, log, env()) as any
+    expect(out.hookSpecificOutput.additionalContext).toContain("n1")
+  })
+
   it("skips catch-up without a project id", () => {
     rmSync(join(project, ".nexus", "config.toml"))
     queue([{ id: "n1", created_at: recent(10) }])

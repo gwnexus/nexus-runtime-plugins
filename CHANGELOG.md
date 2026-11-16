@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`nexus-core` v1.5.3 -- Dispatch catch-up: lock result honoured, title-less notices unfenced (`nexus-dispatch-inbox` 1.0.2).**
+  - **Lock result honoured.** `withObserverLock()` runs its callback with `locked = false` when the per-project lock is not free within one second. The catch-up ignored that value and still read and recorded the queue, so two sessions starting together could both add the same notices. Without the lock the catch-up now adds nothing, logs a warning and leaves the notices pending for a later session.
+  - **Fence only notices that quote a title.** The Dispatch runner now writes `quotes_title` on each queue line. `false` means the text holds only checked fields (short id, peer project name, type, priority, status); `true` means it quotes a peer-written Dispatch title. `formatCatchup()` passes `quotes_title: false` notices as plain lines (still flattened and capped) and fences notices with `true` or no field, so queues written by older runner versions stay fenced. Without a fenced notice the untrusted-data block and its warning are left out. Unknown queue fields are still accepted.
+  - **Forked sessions.** The hook works for every `SessionStart` source. The adapter docs now state that a `SessionStart` matcher, if set, must include `fork` (`startup|resume|clear|compact|fork`); the `nexus-core` `hooks.json` registers the hook without a matcher.
+  - New tests: lock held by another session (nothing injected or recorded, delivered later), title-less notices without a fence, mixed notices with exactly the `true`/missing ones fenced, older queue lines still fenced, unknown fields accepted. `nexus-core` `dispatch-inbox` bundle rebuilt.
+
 ### Security
 - **`nexus-core` v1.5.2 -- a repository-controlled `api_url` could receive the developer's Nexus token.**
   - **The problem.** `.nexus/config.toml` is part of the checked-out repository, but `resolveNexusConfig()` treated its `api_url` as pinned and paired it with a token from another source that carried no URL: `NEXUS_PRIVATE_TOKEN` without `NEXUS_API_URL`, a token-only `.mcp.json` or `opencode.json` entry, or the global `credentials.toml`. A repository that set `api_url` to its own HTTPS host received the developer's token as soon as a hook reached the API. Affected hooks: compaction-plus, cost-control, headroom-intercept and the session-guard release-line check.

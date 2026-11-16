@@ -14,13 +14,13 @@ import { join } from "node:path"
  * - `notices/<project_id>.delivered.claude.jsonl`: notices this plugin added
  *   as session-start context; written only here, append-only.
  *
- * Notices are short pointers (Dispatch id, title, peer); they never carry a
+ * Notices are short pointers (Dispatch id, peer, optionally the title); they never carry a
  * Dispatch body, and this module never fetches one.
  */
 
 export const PLUGIN_META = {
   name: "nexus-dispatch-inbox",
-  version: "1.0.1",
+  version: "1.0.2",
 } as const
 
 /** `sessions/<session_id>.json`, read by the runner. */
@@ -40,6 +40,12 @@ export interface Notice {
   kind?: string
   text: string
   created_at: string
+  /**
+   * True when `text` quotes a peer-written Dispatch title. Missing (queues
+   * from older runner versions) counts as true; only an explicit `false`
+   * marks a notice built from checked fields alone.
+   */
+  quotes_title?: boolean
 }
 
 /** One line of `notices/<project_id>.delivered.claude.jsonl`. */

@@ -32,7 +32,7 @@ auto-discovery mechanism (`.opencode/plugins/`). Migrated plugins (see
 | [**Headroom Intercept**](./adapters/opencode/headroom-intercept/README.md) | `v0.5.23` | Pre-injection context compression for Nexus MCP tool outputs (OpenCode + Claude Code adapters) |
 | [**Session Guard**](./adapters/opencode/session-guard/README.md) | `v1.2.4` | Enforces session append discipline after code-changing tool calls (OpenCode + Claude Code adapters) |
 | [**Routing Guard**](./adapters/opencode/routing-guard/README.md) | `v1.1.1` | Detects model routing divergence between Nexus config and the effective provider catalog (OpenCode + Claude Code adapters) |
-| [**Dispatch Inbox**](./adapters/claude-code/dispatch-inbox/README.md) | `v1.0.1` | Registers running sessions with the Nexus CLI's Dispatch runner and adds missed Dispatch notices at session start (Claude Code only) |
+| [**Dispatch Inbox**](./adapters/claude-code/dispatch-inbox/README.md) | `v1.0.2` | Registers running sessions with the Nexus CLI's Dispatch runner and adds missed Dispatch notices at session start (Claude Code only) |
 | [**Attribution Headers**](./600-attribution-headers/README.md) | `v1.0.0` | Injects session/actor attribution headers on outgoing requests to the Nexus gateway provider |
 
 ## Claude Code plugin marketplace
@@ -229,7 +229,7 @@ provider can be entirely valid while a single model id is wrong.
 
 ## Dispatch Inbox
 
-**`v1.0.1` · [`adapters/claude-code/dispatch-inbox`](./adapters/claude-code/dispatch-inbox) (Claude Code only)**
+**`v1.0.2` · [`adapters/claude-code/dispatch-inbox`](./adapters/claude-code/dispatch-inbox) (Claude Code only)**
 
 Lets the Nexus CLI's Dispatch runner (`nexus dispatch listen`) reach running
 Claude Code sessions, so a new Dispatch or a reply shows up as a short notice
@@ -241,7 +241,8 @@ in the session without a manual sweep.
   newest first, each exactly once.
 - **`SessionEnd`** -- removes the session file.
 
-The token never leaves the 0600 file. Notices never carry a Dispatch body.
+The token never leaves the 0600 file. Notices never carry a Dispatch body;
+notices that quote a peer-written title are fenced as untrusted data.
 
 **Required:** Nexus CLI with `nexus dispatch listen` (the runner); Claude Code's cross-session inbox
 
