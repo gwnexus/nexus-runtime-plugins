@@ -21,11 +21,11 @@ export function appendRecords(
 ): boolean {
   if (records.length === 0) return true
   try {
-    mkdirSync(observerDir, { recursive: true })
+    mkdirSync(observerDir, { recursive: true, mode: 0o700 })
     const path = join(observerDir, EVENTS_FILE)
     rotateIfNeeded(observerDir, path, maxBytes)
     const payload = records.map((r) => JSON.stringify(r)).join("\n") + "\n"
-    appendFileSync(path, payload)
+    appendFileSync(path, payload, { mode: 0o600 })
     return true
   } catch {
     return false

@@ -8,7 +8,7 @@
 
 export const PLUGIN_META = {
   name: "nexus-agent-observer",
-  version: "1.0.2",
+  version: "1.0.3",
   description: "Writes nexus.agent-observation.v1 events from Claude Code hooks for the Agent Observability pane.",
 } as const
 

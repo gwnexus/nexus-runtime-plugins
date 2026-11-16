@@ -29,7 +29,7 @@ auto-discovery mechanism (`.opencode/plugins/`). Migrated plugins (see
 | --- | --- | --- |
 | [**Compaction Plus**](./adapters/opencode/compaction-plus/README.md) | `v1.8.7` | Preserves Nexus session context across compaction events (OpenCode + Claude Code adapters) |
 | [**Cost Control**](./adapters/opencode/cost-control/README.md) | `v1.2.6` | Token usage and cost tracking via native runtime aggregation, with optional Helicone enrichment (OpenCode + Claude Code adapters) |
-| [**Headroom Intercept**](./adapters/opencode/headroom-intercept/README.md) | `v0.5.23` | Pre-injection context compression for Nexus MCP tool outputs (OpenCode + Claude Code adapters) |
+| [**Headroom Intercept**](./adapters/opencode/headroom-intercept/README.md) | `v0.5.24` | Pre-injection context compression for Nexus MCP tool outputs (OpenCode + Claude Code adapters) |
 | [**Session Guard**](./adapters/opencode/session-guard/README.md) | `v1.2.4` | Enforces session append discipline after code-changing tool calls (OpenCode + Claude Code adapters) |
 | [**Routing Guard**](./adapters/opencode/routing-guard/README.md) | `v1.1.1` | Detects model routing divergence between Nexus config and the effective provider catalog (OpenCode + Claude Code adapters) |
 | [**Dispatch Inbox**](./adapters/claude-code/dispatch-inbox/README.md) | `v1.0.2` | Registers running sessions with the Nexus CLI's Dispatch runner and adds missed Dispatch notices at session start (Claude Code only) |
@@ -127,7 +127,7 @@ removing the Helicone dependency.
 
 ## Headroom Intercept
 
-**`v0.5.23` · [`adapters/opencode/headroom-intercept`](./adapters/opencode/headroom-intercept) (OpenCode) · [`adapters/claude-code/headroom-intercept`](./adapters/claude-code/headroom-intercept) (Claude Code)**
+**`v0.5.24` · [`adapters/opencode/headroom-intercept`](./adapters/opencode/headroom-intercept) (OpenCode) · [`adapters/claude-code/headroom-intercept`](./adapters/claude-code/headroom-intercept) (Claude Code)**
 
 > Migrated to the `core/` + `adapters/` structure. All policy,
 > compression, cache, and credential-resolution logic lives in

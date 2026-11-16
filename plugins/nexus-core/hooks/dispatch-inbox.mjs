@@ -104,11 +104,11 @@ function withObserverLock(observerDir, fn, lockFile = LOCK_FILE) {
   const lockPath = join3(observerDir, lockFile);
   let fd = null;
   try {
-    mkdirSync2(observerDir, { recursive: true });
+    mkdirSync2(observerDir, { recursive: true, mode: 448 });
     const deadline = Date.now() + LOCK_WAIT_MS;
     while (fd === null) {
       try {
-        fd = openSync(lockPath, "wx");
+        fd = openSync(lockPath, "wx", 384);
       } catch (err) {
         if (err?.code !== "EEXIST") break;
         if (isStale(lockPath)) {

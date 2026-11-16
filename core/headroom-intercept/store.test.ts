@@ -39,6 +39,23 @@ describe("headroom-intercept core OriginalStore", () => {
     files.clear()
   })
 
+  it("never reads, writes or deletes a file for a key that is not a SHA-256 hex digest", () => {
+    const victim = "/tmp/project/.nexus/victim.json"
+    files.set(victim, "{not json")
+    const store = new OriginalStore("/tmp/project", "p1")
+    expect(store.get("../../victim")).toBeNull()
+    expect(files.get(victim)).toBe("{not json")
+    store.set("../../victim", "x")
+    expect(files.get(victim)).toBe("{not json")
+    expect([...files.keys()].filter((k) => k.endsWith(".json") && k !== victim)).toEqual([])
+  })
+
+  it("persists entries keyed by a SHA-256 hex digest to disk", () => {
+    const hash = "a".repeat(64)
+    new OriginalStore("/tmp/project", "p1").set(hash, "x")
+    expect([...files.keys()].some((k) => k.endsWith(`/${hash}.json`))).toBe(true)
+  })
+
   it("stores and retrieves content by hash via in-memory cache", () => {
     const store = new OriginalStore("/tmp/test-project", "proj-1")
     store.set("hash1", "original content")

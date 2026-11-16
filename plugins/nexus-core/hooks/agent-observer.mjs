@@ -8,7 +8,7 @@ import { isAbsolute as isAbsolute2, join as join3, resolve as resolve3 } from "n
 // core/agent-observer/types.ts
 var PLUGIN_META = {
   name: "nexus-agent-observer",
-  version: "1.0.2",
+  version: "1.0.3",
   description: "Writes nexus.agent-observation.v1 events from Claude Code hooks for the Agent Observability pane."
 };
 var OBSERVATION_SCHEMA = "nexus.agent-observation.v1";
@@ -443,11 +443,11 @@ function withObserverLock(observerDir, fn, lockFile = LOCK_FILE) {
   const lockPath = join(observerDir, lockFile);
   let fd = null;
   try {
-    mkdirSync(observerDir, { recursive: true });
+    mkdirSync(observerDir, { recursive: true, mode: 448 });
     const deadline = Date.now() + LOCK_WAIT_MS;
     while (fd === null) {
       try {
-        fd = openSync2(lockPath, "wx");
+        fd = openSync2(lockPath, "wx", 384);
       } catch (err) {
         if (err?.code !== "EEXIST") break;
         if (isStale(lockPath)) {
@@ -497,10 +497,10 @@ function loadObserverState(observerDir) {
 }
 function saveObserverState(observerDir, state, now = Date.now()) {
   try {
-    mkdirSync(observerDir, { recursive: true });
+    mkdirSync(observerDir, { recursive: true, mode: 448 });
     const pruned = pruneState(state, now);
     const tmp = join(observerDir, `${STATE_FILE}.${process.pid}.tmp`);
-    writeFileSync(tmp, JSON.stringify(pruned));
+    writeFileSync(tmp, JSON.stringify(pruned), { mode: 384 });
     renameSync(tmp, join(observerDir, STATE_FILE));
   } catch {
   }
@@ -531,11 +531,11 @@ var DEFAULT_MAX_BYTES = 5 * 1024 * 1024;
 function appendRecords(observerDir, records, maxBytes = DEFAULT_MAX_BYTES) {
   if (records.length === 0) return true;
   try {
-    mkdirSync2(observerDir, { recursive: true });
+    mkdirSync2(observerDir, { recursive: true, mode: 448 });
     const path = join2(observerDir, EVENTS_FILE);
     rotateIfNeeded(observerDir, path, maxBytes);
     const payload = records.map((r) => JSON.stringify(r)).join("\n") + "\n";
-    appendFileSync(path, payload);
+    appendFileSync(path, payload, { mode: 384 });
     return true;
   } catch {
     return false;

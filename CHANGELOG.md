@@ -8,11 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- **`nexus-core` v1.5.3 -- Dispatch catch-up: lock result honoured, title-less notices unfenced (`nexus-dispatch-inbox` 1.0.2).**
+- **`nexus-core` v1.5.3 -- Dispatch catch-up fixes and security scan follow-ups.**
+  - **Headroom cache keys checked before any file access (`nexus-headroom-intercept` 0.5.24).** `OriginalStore` named disk entries `<key>.json` without checking the key, and `get()` deletes an entry that fails to parse or verify. A key such as `../../x` could therefore read and then delete a `*.json` file outside the cache directory. No exposed entry point passed such a key (the OpenCode retrieve tool checks the format; the manual `debugRetrieve()` did not). The store now reads, writes and deletes files only for full SHA-256 hex digests; any other key stays in memory.
+  - **Agent observer files private (`nexus-agent-observer` 1.0.3).** The observer directory is created with mode 0700, and `events.jsonl`, `state.json` and the lock file with 0600, as the dispatch-inbox and headroom state already were. Existing files keep their mode until the next rotation.
+  - **CI secret scan.** The CI job checks out the full history and runs `gitleaks git --redact` with the repository's `.gitleaks.toml` after the existing config self-test.
+  - Still open, not reachable from plugin code: the `effect`, `zod` and `toml` advisories under the dev-only `@opencode-ai/plugin` (latest 1.19.5 still pins the affected versions).
+  - New tests: a traversal key neither reads, writes nor deletes a file; hex keys still persist; observer directory and file modes.
+- **Dispatch catch-up: lock result honoured, title-less notices unfenced (`nexus-dispatch-inbox` 1.0.2).**
   - **Lock result honoured.** `withObserverLock()` runs its callback with `locked = false` when the per-project lock is not free within one second. The catch-up ignored that value and still read and recorded the queue, so two sessions starting together could both add the same notices. Without the lock the catch-up now adds nothing, logs a warning and leaves the notices pending for a later session.
   - **Fence only notices that quote a title.** The Dispatch runner now writes `quotes_title` on each queue line. `false` means the text holds only checked fields (short id, peer project name, type, priority, status); `true` means it quotes a peer-written Dispatch title. `formatCatchup()` passes `quotes_title: false` notices as plain lines (still flattened and capped) and fences notices with `true` or no field, so queues written by older runner versions stay fenced. Without a fenced notice the untrusted-data block and its warning are left out. Unknown queue fields are still accepted.
   - **Forked sessions.** The hook works for every `SessionStart` source. The adapter docs now state that a `SessionStart` matcher, if set, must include `fork` (`startup|resume|clear|compact|fork`); the `nexus-core` `hooks.json` registers the hook without a matcher.
-  - New tests: lock held by another session (nothing injected or recorded, delivered later), title-less notices without a fence, mixed notices with exactly the `true`/missing ones fenced, older queue lines still fenced, unknown fields accepted. `nexus-core` `dispatch-inbox` bundle rebuilt.
+  - New tests: lock held by another session (nothing injected or recorded, delivered later), title-less notices without a fence, mixed notices with exactly the `true`/missing ones fenced, older queue lines still fenced, unknown fields accepted.
+  - `nexus-core` bundles rebuilt (`dispatch-inbox`, `headroom-intercept`, `agent-observer`).
 
 ### Security
 - **`nexus-core` v1.5.2 -- a repository-controlled `api_url` could receive the developer's Nexus token.**

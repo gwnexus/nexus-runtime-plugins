@@ -465,6 +465,7 @@ function compressByProfile(raw, profile, hash, tool, onTruncated) {
 var CACHE_TTL_MS = 24 * 60 * 60 * 1e3;
 var CACHE_MAX_BYTES = 100 * 1024 * 1024;
 var CACHE_MAX_ENTRIES = 200;
+var DISK_HASH = /^[0-9a-f]{64}$/;
 var OriginalStore = class {
   cache = /* @__PURE__ */ new Map();
   cacheDir;
@@ -510,6 +511,7 @@ var OriginalStore = class {
   }
   set(hash, content) {
     this.cache.set(hash, { content, storedAt: Date.now() });
+    if (!DISK_HASH.test(hash)) return;
     try {
       const filePath = join3(this.cacheDir, `${hash}.json`);
       const unique = `${hash}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
@@ -554,6 +556,7 @@ var OriginalStore = class {
       }
       return cached.content;
     }
+    if (!DISK_HASH.test(hash)) return null;
     try {
       const filePath = join3(this.cacheDir, `${hash}.json`);
       if (!existsSync3(filePath)) return null;
@@ -602,6 +605,7 @@ var OriginalStore = class {
     return null;
   }
   deleteDiskEntry(hash) {
+    if (!DISK_HASH.test(hash)) return;
     try {
       unlinkSync(join3(this.cacheDir, `${hash}.json`));
     } catch {
@@ -1098,7 +1102,7 @@ function isEntrypoint(moduleUrl, argv1 = process.argv[1]) {
 }
 
 // adapters/claude-code/headroom-intercept/nexus-headroom-intercept.ts
-var PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.23" };
+var PLUGIN_META = { name: "nexus-headroom-intercept", version: "0.5.24" };
 var DEFAULT_MODE = "observe";
 var DEBUG = process.env.HEADROOM_DEBUG === "true";
 var GATE_STATE_FILE = "headroom-gate-state.json";

@@ -23,6 +23,14 @@ export const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
 export const CACHE_MAX_BYTES = 100 * 1024 * 1024 // 100 MB
 export const CACHE_MAX_ENTRIES = 200
 
+/**
+ * Disk entries are named `<hash>.json`, so only a full SHA-256 hex digest
+ * (what `contentHash()` returns) may reach the file system. Any other key
+ * stays in memory; a crafted key such as `../x` can neither read nor delete
+ * a file outside the cache directory.
+ */
+const DISK_HASH = /^[0-9a-f]{64}$/
+
 export class OriginalStore {
   private cache = new Map<string, { content: string; storedAt: number }>()
   private cacheDir: string
@@ -68,6 +76,7 @@ export class OriginalStore {
 
   set(hash: string, content: string): void {
     this.cache.set(hash, { content, storedAt: Date.now() })
+    if (!DISK_HASH.test(hash)) return
     try {
       const filePath = join(this.cacheDir, `${hash}.json`)
       const unique = `${hash}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`
@@ -110,6 +119,7 @@ export class OriginalStore {
       }
       return cached.content
     }
+    if (!DISK_HASH.test(hash)) return null
     try {
       const filePath = join(this.cacheDir, `${hash}.json`)
       if (!existsSync(filePath)) return null
@@ -167,6 +177,7 @@ export class OriginalStore {
   }
 
   private deleteDiskEntry(hash: string): void {
+    if (!DISK_HASH.test(hash)) return
     try {
       unlinkSync(join(this.cacheDir, `${hash}.json`))
     } catch {}

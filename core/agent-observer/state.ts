@@ -45,11 +45,11 @@ export function withObserverLock<T>(
   const lockPath = join(observerDir, lockFile)
   let fd: number | null = null
   try {
-    mkdirSync(observerDir, { recursive: true })
+    mkdirSync(observerDir, { recursive: true, mode: 0o700 })
     const deadline = Date.now() + LOCK_WAIT_MS
     while (fd === null) {
       try {
-        fd = openSync(lockPath, "wx")
+        fd = openSync(lockPath, "wx", 0o600)
       } catch (err: any) {
         if (err?.code !== "EEXIST") break
         if (isStale(lockPath)) {
@@ -105,10 +105,10 @@ export function loadObserverState(observerDir: string): ObserverState {
 
 export function saveObserverState(observerDir: string, state: ObserverState, now: number = Date.now()): void {
   try {
-    mkdirSync(observerDir, { recursive: true })
+    mkdirSync(observerDir, { recursive: true, mode: 0o700 })
     const pruned = pruneState(state, now)
     const tmp = join(observerDir, `${STATE_FILE}.${process.pid}.tmp`)
-    writeFileSync(tmp, JSON.stringify(pruned))
+    writeFileSync(tmp, JSON.stringify(pruned), { mode: 0o600 })
     renameSync(tmp, join(observerDir, STATE_FILE))
   } catch {
     // state loss only degrades linking/runtimes; never block the hook

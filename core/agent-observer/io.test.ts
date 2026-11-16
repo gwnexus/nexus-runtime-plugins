@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
@@ -140,6 +141,15 @@ describe("appendRecords", () => {
     appendRecords(obs, [{ n: 3, pad: "x".repeat(60) }], 50)
     appendRecords(obs, [{ n: 4 }], 50)
     expect(readFileSync(join(obs, ROTATED_FILE), "utf-8")).not.toContain('"n":1')
+  })
+
+  it("creates the observer directory 0700 and its files 0600", () => {
+    const obs = join(dir, "observer")
+    appendRecords(obs, [{ n: 1 }])
+    saveObserverState(obs, initialObserverState())
+    expect(statSync(obs).mode & 0o777).toBe(0o700)
+    expect(statSync(join(obs, EVENTS_FILE)).mode & 0o777).toBe(0o600)
+    expect(statSync(join(obs, "state.json")).mode & 0o777).toBe(0o600)
   })
 
   it("swallows filesystem errors", () => {
