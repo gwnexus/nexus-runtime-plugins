@@ -83,6 +83,24 @@ dbx_load_os_override() {
 }
 
 # -------------------------------------------------------------------
+# Project checks: every init/checks.d/*.sh in name order, on every OS,
+# after the OS override and before the status matrix. A check can add
+# rows with _record, e.g. a language toolchain the generator does not
+# know (Rust, Go, ...). These files belong to the project, not to the
+# generator.
+# -------------------------------------------------------------------
+dbx_load_project_checks() {
+  local checks_dir="${DBX_SCRIPTS_ROOT}/init/checks.d" check
+  [[ -d "${checks_dir}" ]] || return 0
+  for check in "${checks_dir}"/*.sh; do
+    [[ -f "${check}" ]] || continue
+    # shellcheck source=/dev/null
+    source "${check}"
+  done
+  return 0
+}
+
+# -------------------------------------------------------------------
 # Command availability check (simple wrapper)
 # -------------------------------------------------------------------
 dbx_has() { command -v "$1" &>/dev/null; }

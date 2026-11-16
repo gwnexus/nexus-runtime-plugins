@@ -107,8 +107,11 @@ check_dev_tools() {
     local gh_login gh_via="global login"
     [[ -n "${GH_CONFIG_DIR:-}" && -f "${DBX_REPO_ROOT}/.nexus/gh.env" ]] && gh_via="project profile"
     # Active account from the account list (no API call); "as <login>" is
-    # the format of gh releases before multi-account support.
-    gh_login="$(gh auth status --hostname "${GH_HOST:-github.com}" 2>&1 | awk '
+    # the format of gh releases before multi-account support. gh exits 1
+    # when no account is logged in (and awk may close the pipe early); under
+    # set -euo pipefail that would end dbx_init.sh without a word, so the
+    # exit status is ignored and the parsed login decides.
+    gh_login="$( { gh auth status --hostname "${GH_HOST:-github.com}" 2>&1 || true; } | awk '
       /Logged in to/ { for (i = 1; i < NF; i++) if ($i == "account" || $i == "as") acct = $(i + 1); if (!first) first = acct }
       /Active account: true/ { print acct; found = 1; exit }
       END { if (!found && first) print first }')"
@@ -210,6 +213,15 @@ print_matrix() {
     nexus-env env.nexus.local plugin-env
   )
   local n_ok=0 n_warn=0 n_fail=0 key val code note
+  # Rows from init/checks.d or an OS override follow, in recording order.
+  local extra known
+  for extra in ${_STATUS_KEYS[@]+"${_STATUS_KEYS[@]}"}; do
+    known=0
+    for key in "${ordered_keys[@]}"; do
+      [[ "${key}" == "${extra}" ]] && { known=1; break; }
+    done
+    (( known == 1 )) || ordered_keys+=("${extra}")
+  done
   for key in "${ordered_keys[@]}"; do
     val="$(_get_status "${key}")"
     [[ -z "${val}" ]] && continue
@@ -294,6 +306,7 @@ check_git_hooks
 check_plugin_env
 check_nexus_env
 dbx_load_os_override
+dbx_load_project_checks
 
 print_matrix
 print_help
