@@ -1,0 +1,145 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "en-US"
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: true
+  high_level_summary: true
+  poem: false
+  in_progress_fortune: false
+  review_status: true
+  collapse_walkthrough: false
+  # Public repository: inline comments carry no codegen prompt sections.
+  enable_prompt_for_ai_agents: false
+  auto_review:
+    enabled: true
+    drafts: false
+    # Small fixes can opt out with the skip-review label.
+    labels:
+      - "!skip-review"
+    base_branches:
+      - main
+
+  # Lock files, generated hook bundles (CI verifies them against source)
+  # and recorded transcript fixtures: reviewing them costs file budget
+  # without findings.
+  path_filters:
+    - "!package-lock.json"
+    - "!plugins/nexus-core/hooks/*.mjs"
+    - "!**/fixtures/**"
+
+  pre_merge_checks:
+    title:
+      mode: "warning"
+      requirements: |
+        Conventional Commits format: `type(scope): subject`, under 72
+        characters, no emojis. The title becomes the squash commit message.
+    description:
+      mode: "warning"
+    docstrings:
+      mode: "off"
+    custom_checks:
+      - name: "Public repository hygiene"
+        mode: "error"
+        instructions: |
+          This repository is public. Fail if any changed file, the PR title
+          or the PR description contains:
+          - internal identifiers: decision record numbers, ticket, task,
+            session or dispatch IDs, project UUIDs
+          - internal hostnames or URLs, or local filesystem paths of a
+            developer machine
+          - secrets, tokens, credentials or private keys
+          - notes that code was generated or assisted by an AI tool, or
+            co-author trailers naming one
+          Names of the supported runtimes and products in code, adapter
+          paths and user-facing docs are allowed.
+      - name: "Changelog entry"
+        mode: "warning"
+        instructions: |
+          If the PR changes files under core/, adapters/, plugins/ or a
+          numbered plugin directory (for example 600-attribution-headers/)
+          in a way users can notice, CHANGELOG.md must gain an entry under
+          the [Unreleased] section. Pure test, CI or refactoring changes
+          without behaviour change pass without an entry.
+
+  path_instructions:
+    - path: "core/**/*.ts"
+      instructions: |
+        Runtime-neutral plugin logic shared by all adapters. Check:
+        - No runtime-specific imports (no @opencode-ai/plugin, no hook
+          stdin/stdout handling); those belong in adapters/
+        - API base URLs are only accepted as https://, or http:// on a
+          loopback host, before a bearer token is sent
+        - Tokens and full token fingerprints never reach logs, state files
+          or text returned to the model
+        - State, lock and cache files are written atomically with mode
+          0o600 inside directories created with 0o700
+        - Text from remote sources (dispatch notices, API responses) is
+          fenced or escaped before it is injected into model context
+        - Cache keys and file names derived from input are restricted to a
+          safe character set (no path traversal)
+
+    - path: "adapters/claude-code/**/*.ts"
+      instructions: |
+        Command hooks: JSON on stdin, JSON or plain text on stdout.
+        Check:
+        - Internal errors exit 0 (fail open) so a broken hook never blocks
+          the host session; only deliberate blocking decisions use a
+          blocking exit code or decision field
+        - The entry point is guarded with isEntrypoint(import.meta.url)
+          so tests can import the module without running it
+        - Source changes need regenerated bundles in
+          plugins/nexus-core/hooks/ (npm run build:nexus-core-plugin)
+        - A new adapter is registered in scripts/build-nexus-core-plugin.mjs,
+          plugins/nexus-core/hooks/hooks.json and the release workflow
+
+    - path: "adapters/opencode/**/*.ts"
+      instructions: |
+        Plugins loaded directly as TypeScript (no build step). Check:
+        - Only @opencode-ai/plugin and core/ imports; relative imports keep
+          the .ts extension
+        - PLUGIN_META.version is bumped together with CHANGELOG.md
+        - Hook handlers catch their own errors and never throw into the host
+
+    - path: "600-attribution-headers/**"
+      instructions: |
+        Standalone plugin that adds attribution headers to outgoing gateway
+        requests. Headers must only be set for the Nexus provider and must
+        never carry tokens or other credentials.
+
+    - path: "plugins/nexus-core/**"
+      instructions: |
+        Plugin manifest, hook registration and agent definitions shipped
+        through the marketplace. Check:
+        - plugin.json version matches the README tables and CHANGELOG.md
+        - Every command in hooks.json points to an existing bundle and
+          quotes the plugin root variable
+        - Agent definition files are precise about scope and tools and
+          contain no internal identifiers
+
+    - path: "**/*.test.ts"
+      instructions: |
+        Vitest suites. Tests must not reach the network or the real home
+        directory: use temp directories and clean them up, stub fetch and
+        environment variables and restore them afterwards.
+
+    - path: "scripts/**"
+      instructions: |
+        Build and CI helper scripts. The bundle build must stay
+        deterministic so the CI verify mode can diff it; shell scripts use
+        set -euo pipefail and quote every expansion.
+
+    - path: ".github/workflows/**"
+      instructions: |
+        Third-party actions are pinned to a full commit SHA with a version
+        comment; permissions stay minimal per job; downloaded binaries are
+        checksum-verified; no untrusted PR input is interpolated into run
+        steps.
+
+    - path: "**/*.md"
+      instructions: |
+        Public documentation in English. Versions and file paths must match
+        the code; no internal identifiers, hosts or AI generation notes.
+
+chat:
+  auto_reply: true
